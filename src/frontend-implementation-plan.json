@@ -1,0 +1,45 @@
+{
+  "kind": "implementation_plan",
+  "version": "1.0",
+  "title": "Scanner-only 2-step scan UX with per-input success feedback and real CPCL auto-print",
+  "requirements": [
+    {
+      "id": "REQ-55",
+      "summary": "Optimize the Scan & Print two-step workflow for scanner-only operation with autofocus, per-input success border, and focus handoff between serial inputs.",
+      "acceptanceCriteria": [
+        "On entering the Scan & Print tab (or after a reset), focus is placed in the “1st Serial Number” input without requiring any tap/click.",
+        "After the app validates the 1st scanned serial successfully, the app (a) plays the configured success sound, (b) renders a clear green success border on the 1st input itself (not only on the outer card), and (c) moves focus to the “2nd Serial Number” input.",
+        "After the app validates the 2nd scanned serial successfully, the app (a) plays the configured success sound, (b) renders a clear green success border on the 2nd input itself, and (c) begins the print flow automatically without requiring any additional user action.",
+        "The inputs remain configured to suppress the on-screen keyboard (scanner wedge friendly), and the workflow remains usable without touch interaction."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/components/AppShell.tsx",
+          "operation": "modify",
+          "description": "Pass Scan & Print active-state into the ScanPrintTab (or force a remount on tab re-entry) so the tab can reliably autofocus the correct input when the user navigates back to it without requiring touch interaction."
+        },
+        {
+          "path": "frontend/src/tabs/ScanPrintTab.tsx",
+          "operation": "modify",
+          "description": "Refactor scan state to track per-field validation (left/right) and apply a clear green success border on each Input element itself when its scan is validated; keep existing validation rules/messages and existing sound event types (success/error/printComplete). Ensure autofocus on entry/reset and focus handoff from 1st to 2nd input after valid 1st scan while keeping inputMode=\"none\" for scanner-only flow."
+        }
+      ]
+    },
+    {
+      "id": "REQ-56",
+      "summary": "Make auto-print actually send generated CPCL to the connected printer transport via the existing printer service, with correct success/failure sounds, UI states, history, diagnostics, and reset behavior.",
+      "acceptanceCriteria": [
+        "When a printer is connected and the 2nd scan is valid, the app generates the CPCL payload using the current label settings and calls the printer service to send the CPCL to the printer.",
+        "If sending CPCL fails, the UI shows an error state and plays the error sound (and does not record the print as successful).",
+        "If sending CPCL succeeds, the app plays the print-complete sound, records the print in local print history with the CPCL payload, increments diagnostics counters, and resets the form back to step 1 with focus in the 1st input."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/tabs/ScanPrintTab.tsx",
+          "operation": "modify",
+          "description": "Update the post-2nd-scan auto-print flow to: generate CPCL via the existing generator, call usePrinterService().sendCPCL(cpcl) to actually transmit CPCL, and only mark history/diagnostics as successful after sendCPCL resolves. On sendCPCL failure, set an error UI state, playSound('error'), increment error diagnostics, and avoid recording the attempt as successful. On success, playSound('printComplete'), add local print history with CPCL payload, increment print diagnostics/type counters, and reset back to step 1 with autofocus on the 1st input."
+        }
+      ]
+    }
+  ]
+}

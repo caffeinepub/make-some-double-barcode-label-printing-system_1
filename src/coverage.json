@@ -1,0 +1,51 @@
+{
+  "kind": "coverage_report",
+  "version": "1.0",
+  "generatedAt": "2026-02-08T18:11:47.222Z",
+  "sources": {
+    "buildRequest": true,
+    "implementationPlan": true
+  },
+  "requirements": {
+    "total": 2,
+    "implemented": 2,
+    "items": [
+      {
+        "id": "REQ-55",
+        "summary": "Update the Scan & Print tab two-step serial workflow so it is explicitly optimized for barcode-scanner-only input: (1) autofocus the 1st Serial Number input on entry/reset, (2) after a valid 1st scan play the success sound, show a green success border on the 1st input, and move focus to the 2nd input, (3) after a valid 2nd scan play the success sound, show a green success border on the 2nd input, and immediately proceed to auto-print.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/components/AppShell.tsx",
+          "frontend/src/tabs/ScanPrintTab.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/components/AppShell.tsx",
+          "frontend/src/tabs/ScanPrintTab.tsx"
+        ]
+      },
+      {
+        "id": "REQ-56",
+        "summary": "Fix the auto-print step in the Scan & Print tab so that after a valid 2nd scan the app actually sends the generated CPCL payload to the connected printer transport via the existing printer service (CPCL protocol), rather than only logging/recording history.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/tabs/ScanPrintTab.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/tabs/ScanPrintTab.tsx"
+        ]
+      }
+    ]
+  },
+  "changedFiles": [
+    "build-request.json",
+    "feature_evidence.json",
+    "frontend-file-summaries.txt",
+    "frontend-implementation-plan.json",
+    "frontend/src/components/AppShell.tsx",
+    "frontend/src/tabs/ScanPrintTab.tsx",
+    "project_state.json",
+    "scratch/component-selection.json",
+    "spec.md",
+    "spec_vs_diff_report.json"
+  ]
+}

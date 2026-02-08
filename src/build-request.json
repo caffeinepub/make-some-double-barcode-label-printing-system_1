@@ -1,0 +1,58 @@
+{
+  "kind": "build_request",
+  "title": "Scanner-only two-step serial scanning with per-field success feedback and real CPCL auto-print",
+  "priority": "normal",
+  "requirements": [
+    {
+      "id": "REQ-55",
+      "text": "Update the Scan & Print tab two-step serial workflow so it is explicitly optimized for barcode-scanner-only input: (1) autofocus the 1st Serial Number input on entry/reset, (2) after a valid 1st scan play the success sound, show a green success border on the 1st input, and move focus to the 2nd input, (3) after a valid 2nd scan play the success sound, show a green success border on the 2nd input, and immediately proceed to auto-print.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-2"
+        ],
+        "quotes": [
+          "serial number only inputed by barcode scanner, foucs on 1st box then oonce good scan is done make good sound notification and green border and focus on 2nd box same as 1st box when good scan is done make good sound notification green border"
+        ]
+      },
+      "acceptanceCriteria": [
+        "On entering the Scan & Print tab (or after a reset), focus is placed in the “1st Serial Number” input without requiring any tap/click.",
+        "After the app validates the 1st scanned serial successfully, the app (a) plays the configured success sound, (b) renders a clear green success border on the 1st input itself (not only on the outer card), and (c) moves focus to the “2nd Serial Number” input.",
+        "After the app validates the 2nd scanned serial successfully, the app (a) plays the configured success sound, (b) renders a clear green success border on the 2nd input itself, and (c) begins the print flow automatically without requiring any additional user action.",
+        "The inputs remain configured to suppress the on-screen keyboard (scanner wedge friendly), and the workflow remains usable without touch interaction."
+      ]
+    },
+    {
+      "id": "REQ-56",
+      "text": "Fix the auto-print step in the Scan & Print tab so that after a valid 2nd scan the app actually sends the generated CPCL payload to the connected printer transport via the existing printer service (CPCL protocol), rather than only logging/recording history.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-2"
+        ],
+        "quotes": [
+          "but now automatycli print label using cpcl protocol"
+        ]
+      },
+      "acceptanceCriteria": [
+        "When a printer is connected and the 2nd scan is valid, the app generates the CPCL payload using the current label settings and calls the printer service to send the CPCL to the printer.",
+        "If sending CPCL fails, the UI shows an error state and plays the error sound (and does not record the print as successful).",
+        "If sending CPCL succeeds, the app plays the print-complete sound, records the print in local print history with the CPCL payload, increments diagnostics counters, and resets the form back to step 1 with focus in the 1st input."
+      ]
+    }
+  ],
+  "constraints": [
+    "Do not modify any files under frontend/src/components/ui or other paths listed as immutable in SYSTEM_CONTEXT.",
+    "Keep the existing two-step validation rules (unknown prefix, type mismatch, and printer-not-connected must still block printing and surface errors in English).",
+    "Maintain the existing sound system event types (success, error, printComplete) and use them for scan/print feedback."
+  ],
+  "nonGoals": [
+    "Do not add new printer connection methods or change Devices tab connection UI in this request.",
+    "Do not change label settings, label preview rendering, or CPCL layout logic beyond what is required to send the already-generated CPCL to the printer.",
+    "Do not add backend changes; this request is limited to frontend scan/print behavior and CPCL sending."
+  ],
+  "imageRequirements": {
+    "required": [],
+    "edits": []
+  }
+}

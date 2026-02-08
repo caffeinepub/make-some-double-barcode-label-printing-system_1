@@ -1,0 +1,44 @@
+{
+  "kind": "feature_evidence_report",
+  "features": [
+    {
+      "featureId": "feature-update-the-scan-print-tab-two-step-serial-workflow-so-it-is-explicitly-optimized-for-barcode-scanner-only-input-1-autofocus-the-1st-serial-number-input-on-entry-reset-2-after-a-valid-1st-scan-play-the-success-sound-show-a-green-success-border-on-the-1st-input-and-move-focus-to-the-2nd-input-3-after-a-valid-2nd-scan-play-the-success-sound-show-a-green-success-border-on-the-2nd-input-and-immediately-proceed-to-auto-print",
+      "featureTitle": "Update the Scan & Print tab two-step serial workflow so it is explicitly optimized for barcode-scanner-only input: (1) autofocus the 1st Serial Number input on entry/reset, (2) after a valid 1st scan play the success sound, show a green success border on the 1st input, and move focus to the 2nd input, (3) after a valid 2nd scan play the success sound, show a green success border on the 2nd input, and immediately proceed to auto-print.",
+      "files": [
+        "frontend/src/components/AppShell.tsx",
+        "frontend/src/tabs/ScanPrintTab.tsx"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-55"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-fix-the-auto-print-step-in-the-scan-print-tab-so-that-after-a-valid-2nd-scan-the-app-actually-sends-the-generated-cpcl-payload-to-the-connected-printer-transport-via-the-existing-printer-service-cpcl-protocol-rather-than-only-logging-recording-history",
+      "featureTitle": "Fix the auto-print step in the Scan & Print tab so that after a valid 2nd scan the app actually sends the generated CPCL payload to the connected printer transport via the existing printer service (CPCL protocol), rather than only logging/recording history.",
+      "files": [
+        "frontend/src/tabs/ScanPrintTab.tsx"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-56"
+      ],
+      "confidence": "high"
+    }
+  ]
+}

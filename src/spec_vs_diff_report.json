@@ -1,0 +1,47 @@
+{
+  "kind": "spec_vs_diff_report",
+  "version": "1.0",
+  "generatedAt": "2026-02-08T18:11:47.218Z",
+  "summary": "The diff shows partial implementation toward scanner-optimized two-step scanning (autofocus and step-based focus changes are evident). However, due to truncation, key acceptance-criteria behaviors for per-field green success borders, keyboard suppression, and the actual CPCL send/print success+failure handling cannot be confirmed from the provided code excerpt. AppShell also includes unrelated footer/title changes.",
+  "missing_requirements": [
+    {
+      "id": "REQ-55",
+      "requirement": "Per-field success feedback and scanner-only workflow details: green success border on each input itself, suppress on-screen keyboard, and automatic print trigger after 2nd valid scan.",
+      "reason": "Autofocus and step-based focus management are shown, and left-scan success sound is shown, but the diff snippet is truncated before any input styling (green border on the input element) and before the full right-serial success path that should auto-trigger printing. Keyboard suppression (e.g., inputMode=\"none\") is not visible in the shown excerpt.",
+      "evidence": [
+        "frontend/src/tabs/ScanPrintTab.tsx (truncated excerpt shows focus effects and left scan success sound, but not input className/border styling nor full right-scan flow)"
+      ]
+    },
+    {
+      "id": "REQ-56",
+      "requirement": "After valid 2nd scan, actually send generated CPCL to the connected printer via existing printer service; on failure show UI error + error sound and do not record success; on success play printComplete sound, record history with CPCL, increment counters, reset to step 1 and refocus.",
+      "reason": "The file imports generateCPCL, playSound, diagnostics/history functions, and usePrinterService({ sendCPCL }), but the provided diff content is truncated before the printing/sendCPCL logic and its success/failure handling can be verified.",
+      "evidence": [
+        "frontend/src/tabs/ScanPrintTab.tsx (truncated; imports show intent but do not show sendCPCL invocation or success/error branches)"
+      ]
+    }
+  ],
+  "hallucinated_features": [
+    {
+      "description": "Footer branding/link and decorative heart in footer text.",
+      "reason": "Not requested by REQ-55/REQ-56 and unrelated to scan/print workflow or CPCL sending changes.",
+      "evidence": [
+        "frontend/src/components/AppShell.tsx (footer: \"Built with ❤️ using caffeine.ai\" link)"
+      ]
+    },
+    {
+      "description": "App header title changed/displayed as \"Make Some Double!!\".",
+      "reason": "Not requested by REQ-55/REQ-56; unrelated UI copy change.",
+      "evidence": [
+        "frontend/src/components/AppShell.tsx (h1 text)"
+      ]
+    }
+  ],
+  "confidence": 0.62,
+  "changed_files": [
+    "frontend-file-summaries.txt",
+    "frontend/src/components/AppShell.tsx",
+    "frontend/src/tabs/ScanPrintTab.tsx",
+    "project_state.json"
+  ]
+}

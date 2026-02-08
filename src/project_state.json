@@ -1,0 +1,529 @@
+{
+  "schemaVersion": "1.0.0",
+  "projectStateVersion": 35,
+  "summary": "Build “Make Some Double!!” Barcode & Label Printing System: an Android tablet web app (dark, touch/scanner-only) with React/TypeScript frontend supporting password-only local session auth, scan-to-auto-print CPCL label workflows, label settings with 1:1 preview, device connectivity, diagnostics/history/logs, sounds, and keep-awake — with Label Settings operating in Local-only mode (no backend dependency).",
+  "architectural_notes": [
+    "Platform: Android tablet web app; dark mode, touch-friendly, scanner-only UI (inputmode=none)",
+    "Frontend: React/TypeScript; Backend: Motoko on Internet Computer",
+    "Auth model: password-only local session (with expiry) required for UI access, submitting print jobs, and loading label settings; Internet Identity not used for printing",
+    "Printer: CPCL printing over Bluetooth/USB with connection status card and blocking error banner when disconnected",
+    "Label type auto-detected via editable prefix mappings (no manual type selection); supported types from backend: dualBand, triBand, newDualBand",
+    "Two-step serial scan workflow with validation (unknown prefix, mismatched type, duplicate serial), sounds, colored borders; auto-print after second valid scan when connected + unlocked",
+    "Label settings stored in backend as single LabelSettings record (includes prefix mappings and advanced layout fields); frontend loads on launch; true 1:1 label preview matches CPCL layout and updates only when settings change",
+    "Diagnostics/history/log viewer + counters stored locally; print jobs stored indefinitely in backend with IDs and validation",
+    "Sound system: success scan, error scan, print complete; user-selectable sounds + volume/test; persisted locally",
+    "Keep-awake: Wake Lock API toggle in Scan & Print to prevent screen sleep on Android tablets"
+  ],
+  "known_issues": [
+    "Lock Screen currently accepts any non-empty password (no real password validation), which can make the app appear stuck/not loading when the unlock action/input handling fails or when expecting a specific password like 'swh1400'.",
+    "App runtime crash: React hook error `usePasswordSession must be used within PasswordSessionProvider` thrown in `App`, indicating missing/incorrect provider wrapping and preventing the UI from rendering.",
+    "Console noise during draft environment: `Unchecked runtime.lastError: No tab with id ...` and `draft-editor:error disallowed origin ...` messages appear (likely from extension/editor embed), plus unused preloaded font warnings.",
+    "Counters section is missing on the Scan & Print main screen (no per-serial/label-type counter cards are displayed as expected).",
+    "Label Settings: saving prefix mappings via the Save action does not persist changes (user reports added prefix not saved).",
+    "Label Settings: Tri Band label type is missing from the label type list (cannot select/assign triBand in prefix mappings as expected).",
+    "Label Settings: Label Preview is not rendering 1:1 / does not accurately match the printed label layout (user reports preview looks bad vs expected).",
+    "Label Preview at 200% zoom shows barcodes poorly/incorrectly; needs improved rendering so preview matches printed output (esp. for 48x30mm label)."
+  ],
+  "isFixRequest": true,
+  "existing_features": [
+    {
+      "id": "feature-build-the-frontend-password-only-lock-screen-and-local-session-system-the-app-must-boot-into-a-locked-state-when-no-valid-local-session-exists-unlocking-creates-a-locally-persisted-session-with-expiry-locking-returns-the-app-to-the-locked-state-the-session-must-be-required-to-access-the-ui-submit-print-jobs-and-load-label-settings-and-must-be-forwarded-with-backend-calls-to-satisfy-backend-authorization",
+      "title": "Build the frontend password-only Lock Screen and local session system: the app must boot into a locked state when no valid local session exists; unlocking creates a locally-persisted session with expiry; locking returns the app to the locked state. The session must be required to access the UI, submit print jobs, and load label settings, and must be forwarded with backend calls to satisfy backend authorization.",
+      "reqIds": [
+        "REQ-3"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-implement-the-main-tablet-first-ui-shell-with-dark-warehouse-styling-and-large-touch-targets-organized-into-tabs-matching-the-spec-scan-print-label-settings-devices-diagnostics-ensure-the-ui-is-scanner-only-friendly-touch-friendly-dark-mode-with-consistent-layout-across-tabs",
+      "title": "Implement the main tablet-first UI shell with dark warehouse styling and large touch targets, organized into tabs matching the spec: Scan & Print, Label Settings, Devices, Diagnostics. Ensure the UI is scanner-only friendly (touch-friendly, dark mode), with consistent layout across tabs.",
+      "reqIds": [
+        "REQ-4"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-implement-the-scan-print-workflow-end-to-end-two-step-serial-scanning-where-scan-1-detects-label-type-from-prefix-using-editable-prefix-mappings-scan-2-must-match-detected-label-type-validate-unknown-prefix-mismatched-type-and-duplicate-serials-show-success-error-sounds-and-colored-borders-display-printer-status-card-and-a-blocking-error-banner-when-disconnected-when-scan-2-is-valid-and-printer-is-connected-and-session-is-unlocked-automatically-generate-cpcl-and-send-to-the-printer-service-on-success-increment-counters-update-diagnostics-save-history-reset-inputs-and-autofocus-on-failure-show-error-banner-and-error-sound",
+      "title": "Implement the Scan & Print workflow end-to-end: two-step serial scanning where scan #1 detects label type from prefix using editable prefix mappings; scan #2 must match detected label type; validate unknown prefix, mismatched type, and duplicate serials; show success/error sounds and colored borders; display printer status card and a blocking error banner when disconnected; when scan #2 is valid AND printer is connected AND session is unlocked, automatically generate CPCL and send to the printer service; on success increment counters, update diagnostics, save history, reset inputs and autofocus; on failure show error banner and error sound.",
+      "reqIds": [
+        "REQ-5"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-implement-frontend-cpcl-generation-and-backend-print-job-submission-integration-determine-label-title-from-prefix-mapping-generate-cpcl-payload-from-current-label-settings-basic-cpcl-with-optional-advanced-layout-fields-when-present-submit-a-print-job-to-the-motoko-backend-and-store-the-cpcl-payload-in-local-history-for-diagnostics-reprint",
+      "title": "Implement frontend CPCL generation and backend print job submission integration: determine label title from prefix mapping; generate CPCL payload from current label settings (basic CPCL with optional advanced layout fields when present); submit a print job to the Motoko backend and store the CPCL payload in local history for diagnostics/reprint.",
+      "reqIds": [
+        "REQ-6"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-build-the-label-settings-tab-provide-a-touch-friendly-editor-for-label-width-height-mm-barcode-type-height-font-size-spacing-prefix-mappings-and-all-advanced-layout-fields-load-settings-from-the-backend-on-app-launch-when-session-is-valid-and-persist-updates-back-to-the-backend-admin-only",
+      "title": "Build the Label Settings tab: provide a touch-friendly editor for label width/height (mm), barcode type/height, font size, spacing, prefix mappings, and all advanced layout fields. Load settings from the backend on app launch (when session is valid) and persist updates back to the backend (admin-only).",
+      "reqIds": [
+        "REQ-7"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-implement-the-true-1-1-label-preview-that-matches-the-printed-cpcl-layout-exactly-it-must-update-only-when-label-settings-change-and-must-not-change-based-on-scanning-activity",
+      "title": "Implement the true 1:1 Label Preview that matches the printed CPCL layout exactly; it must update only when label settings change and must not change based on scanning activity.",
+      "reqIds": [
+        "REQ-8"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-build-the-devices-tab-implement-cpcl-printer-connection-management-with-connect-and-refresh-actions-show-current-connection-status-and-display-a-scanner-section-that-verifies-keyboard-wedge-mode-and-prevents-the-virtual-keyboard-from-appearing-during-scanning-focused-inputs",
+      "title": "Build the Devices tab: implement CPCL printer connection management with Connect and Refresh actions, show current connection status, and display a scanner section that verifies keyboard-wedge mode and prevents the virtual keyboard from appearing during scanning-focused inputs.",
+      "reqIds": [
+        "REQ-9"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-build-the-diagnostics-tab-with-locally-stored-diagnostics-stats-total-scans-labels-printed-errors-a-print-history-viewer-including-timestamp-both-serials-label-type-cpcl-payload-and-a-reprint-action-plus-a-log-viewer-that-supports-info-warn-error-levels-with-timestamps-persist-diagnostics-history-and-logs-in-local-storage",
+      "title": "Build the Diagnostics tab with locally-stored diagnostics: stats (total scans, labels printed, errors), a print history viewer including timestamp, both serials, label type, CPCL payload, and a reprint action, plus a log viewer that supports info/warn/error levels with timestamps. Persist diagnostics, history, and logs in local storage.",
+      "reqIds": [
+        "REQ-10"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-implement-the-sound-system-provide-three-event-types-success-scan-error-scan-print-complete-with-user-selectable-sounds-volume-control-and-test-buttons-persist-sound-selections-and-volume-locally-ensure-the-correct-sound-plays-for-each-event-in-the-scan-print-workflow",
+      "title": "Implement the sound system: provide three event types (success scan, error scan, print complete) with user-selectable sounds, volume control, and test buttons; persist sound selections and volume locally; ensure the correct sound plays for each event in the scan/print workflow.",
+      "reqIds": [
+        "REQ-11"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-implement-keep-awake-mode-using-the-browser-wake-lock-api-when-available-with-a-ui-toggle-located-in-the-scan-print-tab-the-toggle-state-should-persist-locally-and-prevent-screen-sleep-on-supported-android-tablet-browsers",
+      "title": "Implement keep-awake mode using the browser Wake Lock API when available, with a UI toggle located in the Scan & Print tab. The toggle state should persist locally and prevent screen sleep on supported Android tablet browsers.",
+      "reqIds": [
+        "REQ-12"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-apply-a-coherent-visual-theme-for-a-dark-warehouse-tablet-ui-with-blue-accents-no-additional-feature-changes-define-a-consistent-color-palette-typography-scale-spacing-card-badge-styles-and-focus-validation-states-success-error-borders-and-use-them-across-lock-screen-and-all-tabs",
+      "title": "Apply a coherent visual theme for a dark warehouse tablet UI with blue accents (no additional feature changes): define a consistent color palette, typography scale, spacing, card/badge styles, and focus/validation states (success/error borders) and use them across Lock Screen and all tabs.",
+      "reqIds": [
+        "REQ-13"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-enforce-real-lock-screen-password-validation-so-unlocking-succeeds-only-when-the-entered-password-exactly-matches-the-configured-password-e-g-swh1400-and-fails-for-any-other-input-including-non-empty-incorrect-passwords",
+      "title": "Enforce real Lock Screen password validation so unlocking succeeds only when the entered password exactly matches the configured password (e.g., \"swh1400\"), and fails for any other input (including non-empty incorrect passwords).",
+      "reqIds": [
+        "REQ-14"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-a-supported-configuration-mechanism-for-the-expected-lock-screen-password-so-it-can-be-set-without-editing-application-logic-default-should-allow-swh1400-as-the-configured-value",
+      "title": "Add a supported configuration mechanism for the expected Lock Screen password so it can be set without editing application logic (default should allow \"swh1400\" as the configured value).",
+      "reqIds": [
+        "REQ-15"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-improve-lock-screen-failure-handling-so-that-when-unlock-fails-the-ui-clearly-indicates-the-password-was-incorrect-and-the-input-remains-usable-for-immediate-retry-including-enter-to-submit-behavior",
+      "title": "Improve Lock Screen failure handling so that when unlock fails, the UI clearly indicates the password was incorrect and the input remains usable for immediate retry (including Enter-to-submit behavior).",
+      "reqIds": [
+        "REQ-16"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-the-react-runtime-crash-usepasswordsession-must-be-used-within-passwordsessionprovider-by-ensuring-the-passwordsessionprovider-wraps-the-component-tree-before-any-component-calls-usepasswordsession-including-app-lockscreen-and-appshell-because-frontend-src-main-tsx-is-immutable-implement-the-provider-wrapping-within-editable-components-e-g-refactor-frontend-src-app-tsx-into-a-provider-wrapper-plus-an-inner-component-that-uses-the-hook",
+      "title": "Fix the React runtime crash `usePasswordSession must be used within PasswordSessionProvider` by ensuring the PasswordSessionProvider wraps the component tree before any component calls `usePasswordSession` (including `App`, `LockScreen`, and `AppShell`). Because `frontend/src/main.tsx` is immutable, implement the provider wrapping within editable components (e.g., refactor `frontend/src/App.tsx` into a provider wrapper plus an inner component that uses the hook).",
+      "reqIds": [
+        "REQ-17"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-a-minimal-user-safe-fallback-so-that-if-a-password-session-context-wiring-mistake-happens-again-in-the-future-the-ui-fails-gracefully-shows-a-simple-english-error-screen-rather-than-a-blank-page-the-fallback-must-not-depend-on-modifying-immutable-files",
+      "title": "Add a minimal, user-safe fallback so that if a password-session context wiring mistake happens again in the future, the UI fails gracefully (shows a simple English error screen) rather than a blank page. The fallback must not depend on modifying immutable files.",
+      "reqIds": [
+        "REQ-18"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-do-not-treat-the-following-console-messages-as-application-errors-requiring-fixes-unchecked-runtime-lasterror-no-tab-with-id-draft-editor-error-disallowed-origin-and-the-rokt-icons-woff-preload-warnings-as-they-appear-to-come-from-the-draft-editor-environment-or-third-party-injections-rather-than-the-app-code-ensure-no-app-logic-relies-on-those-origins-or-resources",
+      "title": "Do not treat the following console messages as application errors requiring fixes: `Unchecked runtime.lastError: No tab with id ...`, `draft-editor:error disallowed origin: ...`, and the `rokt-icons.woff` preload warnings, as they appear to come from the draft/editor environment or third-party injections rather than the app code. Ensure no app logic relies on those origins or resources.",
+      "reqIds": [
+        "REQ-19"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-update-the-scan-print-tab-ui-to-rename-the-two-serial-scan-fields-from-left-serial-and-right-serial-to-1st-serial-number-and-2nd-serial-number-including-any-step-instructional-text-that-currently-references-left-right-scanning",
+      "title": "Update the Scan & Print tab UI to rename the two serial scan fields from “Left Serial” and “Right Serial” to “1st Serial Number” and “2nd Serial Number”, including any step/instructional text that currently references “left”/“right” scanning.",
+      "reqIds": [
+        "REQ-20"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-move-the-printer-connection-status-indicator-and-the-keep-awake-screen-wake-lock-toggle-out-of-the-scan-print-tab-right-side-cards-and-into-the-appshell-header-top-right-area-next-to-the-existing-lock-button",
+      "title": "Move the Printer Connection Status indicator and the Keep Awake (screen wake lock) toggle out of the Scan & Print tab right-side cards and into the AppShell header top-right area next to the existing Lock button.",
+      "reqIds": [
+        "REQ-21"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-locally-persisted-counters-segmented-by-scanned-serial-type-based-on-the-detected-prefix-mapping-e-g-per-prefix-and-or-per-detected-labeltype-and-update-these-counters-during-the-scan-print-workflow",
+      "title": "Add locally persisted counters segmented by scanned serial type based on the detected prefix mapping (e.g., per prefix and/or per detected labelType) and update these counters during the Scan & Print workflow.",
+      "reqIds": [
+        "REQ-22"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-a-counters-section-to-the-scan-print-main-screen-that-shows-a-touch-friendly-set-of-counter-cards-for-each-configured-serial-type-based-on-label-settings-prefix-mappings-displaying-at-minimum-the-current-printed-count-for-that-serial-type-the-cards-must-update-live-as-scans-prints-occur-and-must-reflect-the-locally-persisted-per-type-counters",
+      "title": "Add a counters section to the Scan & Print main screen that shows a touch-friendly set of counter cards for each configured serial type (based on label settings prefix mappings), displaying at minimum the current printed count for that serial type; the cards must update live as scans/prints occur and must reflect the locally persisted per-type counters.",
+      "reqIds": [
+        "REQ-23"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-ensure-the-per-serial-type-counter-cards-are-visible-on-the-scan-print-main-screen-above-the-scanning-inputs-and-match-the-intended-card-layout-shown-in-the-provided-screenshots-three-touch-friendly-cards-in-a-grid-with-a-printer-icon-and-a-large-numeric-count",
+      "title": "Ensure the per-serial-type counter cards are visible on the Scan & Print main screen (above the scanning inputs) and match the intended card layout shown in the provided screenshots (three touch-friendly cards in a grid with a printer icon and a large numeric count).",
+      "reqIds": [
+        "REQ-24"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-make-the-counters-section-fail-safe-so-it-does-not-disappear-silently-when-label-settings-are-still-loading-show-a-visible-loading-state-when-there-are-no-prefix-mappings-configured-show-a-visible-empty-state-message-instead-of-returning-null",
+      "title": "Make the counters section fail-safe so it does not disappear silently: when label settings are still loading, show a visible loading state; when there are no prefix mappings configured, show a visible empty-state message instead of returning null.",
+      "reqIds": [
+        "REQ-25"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-label-settings-persistence-so-that-when-a-user-adds-edits-prefix-mappings-including-new-prefixes-and-taps-save-settings-the-changes-reliably-persist-and-are-visible-after-a-refresh-reload",
+      "title": "Fix Label Settings persistence so that when a user adds/edits Prefix Mappings (including new prefixes) and taps “Save Settings”, the changes reliably persist and are visible after a refresh/reload.",
+      "reqIds": [
+        "REQ-26"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-improve-label-settings-save-error-handling-for-admin-only-updates-when-updatelabelsettings-fails-due-to-missing-admin-permissions-show-clear-english-guidance-that-saving-settings-requires-admin-access-and-that-admin-access-is-initialized-via-the-secret-url-parameter-caffeineadmintoken-as-used-by-the-actor-initialization",
+      "title": "Improve Label Settings save error handling for admin-only updates: when updateLabelSettings fails due to missing admin permissions, show clear English guidance that saving settings requires admin access and that admin access is initialized via the secret URL parameter `caffeineAdminToken` (as used by the actor initialization).",
+      "reqIds": [
+        "REQ-27"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-an-option-in-label-settings-to-support-adding-more-label-types-beyond-the-current-fixed-list-by-allowing-users-to-create-and-use-custom-labeltype-values-in-prefix-mappings",
+      "title": "Add an option in Label Settings to support adding more label types beyond the current fixed list by allowing users to create and use custom labelType values in Prefix Mappings.",
+      "reqIds": [
+        "REQ-28"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-label-settings-so-prefix-mappings-reliably-persist-after-tapping-save-settings-and-are-still-present-after-a-hard-refresh-reload",
+      "title": "Fix Label Settings so Prefix Mappings reliably persist after tapping “Save Settings” and are still present after a hard refresh/reload.",
+      "reqIds": [
+        "REQ-29"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-ensure-the-tri-band-label-type-is-available-visible-in-the-label-settings-label-type-selection-suggestions-for-prefix-mappings",
+      "title": "Ensure the Tri Band label type is available/visible in the Label Settings label type selection/suggestions for Prefix Mappings.",
+      "reqIds": [
+        "REQ-30"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-a-clear-option-in-label-settings-to-support-adding-more-label-types-beyond-the-built-in-set-so-users-can-create-and-use-additional-labeltype-values-for-prefix-mappings-without-editing-code",
+      "title": "Add a clear option in Label Settings to support adding more label types beyond the built-in set, so users can create and use additional labelType values for Prefix Mappings (without editing code).",
+      "reqIds": [
+        "REQ-31"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-ensure-the-frontend-actor-initialization-consistently-initializes-backend-access-control-using-the-caffeineadmintoken-secret-parameter-even-when-internet-identity-is-not-authenticated-so-that-admin-enabled-sessions-can-actually-save-label-settings",
+      "title": "Ensure the frontend actor initialization consistently initializes backend access control using the `caffeineAdminToken` secret parameter even when Internet Identity is not authenticated, so that admin-enabled sessions can actually save Label Settings.",
+      "reqIds": [
+        "REQ-33"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-after-a-successful-label-settings-save-ensure-the-label-settings-tab-reliably-reflects-the-freshly-persisted-backend-state-when-the-user-navigates-away-and-returns-no-reversion-to-old-settings-prefix-mappings",
+      "title": "After a successful Label Settings save, ensure the Label Settings tab reliably reflects the freshly persisted backend state when the user navigates away and returns (no reversion to old settings/prefix mappings).",
+      "reqIds": [
+        "REQ-34"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-stop-automatically-reloading-label-settings-from-the-backend-whenever-the-user-navigates-to-the-label-settings-tab-the-app-must-keep-and-reuse-the-currently-cached-persisted-label-settings-in-app-when-switching-tabs",
+      "title": "Stop automatically reloading label settings from the backend whenever the user navigates to the “Label Settings” tab. The app must keep and reuse the currently cached/persisted label settings in-app when switching tabs.",
+      "reqIds": [
+        "REQ-35"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-an-explicit-user-initiated-way-to-refresh-label-settings-from-the-backend-e-g-a-refresh-from-backend-button-in-the-label-settings-tab-so-settings-can-be-updated-on-demand-without-automatic-refetch-on-tab-entry-behavior",
+      "title": "Add an explicit, user-initiated way to refresh Label Settings from the backend (e.g., a “Refresh from Backend” button in the Label Settings tab) so settings can be updated on demand without automatic refetch-on-tab-entry behavior.",
+      "reqIds": [
+        "REQ-36"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-update-the-label-settings-query-behavior-so-that-once-label-settings-are-successfully-loaded-and-cached-they-are-not-re-fetched-unnecessarily-e-g-on-remount-focus-unless-explicitly-refreshed-or-invalidated-due-to-actor-session-changes",
+      "title": "Update the label settings query behavior so that once label settings are successfully loaded and cached, they are not re-fetched unnecessarily (e.g., on remount/focus) unless explicitly refreshed or invalidated due to actor/session changes.",
+      "reqIds": [
+        "REQ-37"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-improve-frontend-error-handling-to-explicitly-detect-and-explain-the-ic0508-canister-is-stopped-condition-for-label-settings-actions-save-refresh-using-clear-english-user-facing-text-instead-of-showing-a-generic-error",
+      "title": "Improve frontend error handling to explicitly detect and explain the IC0508 \"canister is stopped\" condition for Label Settings actions (save + refresh) using clear English user-facing text, instead of showing a generic error.",
+      "reqIds": [
+        "REQ-39"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-a-visible-non-blocking-backend-availability-indicator-somewhere-in-the-main-app-shell-e-g-header-or-label-settings-tab-header-that-shows-when-backend-calls-are-failing-due-to-ic0508-so-users-immediately-understand-why-settings-cannot-load-save",
+      "title": "Add a visible, non-blocking backend availability indicator somewhere in the main app shell (e.g., header or Label Settings tab header) that shows when backend calls are failing due to IC0508 so users immediately understand why settings cannot load/save.",
+      "reqIds": [
+        "REQ-40"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-a-backend-free-local-only-settings-mode-for-label-settings-so-the-user-can-save-and-load-label-settings-including-prefix-mappings-and-all-advanced-layout-fields-entirely-from-local-device-storage-without-requiring-any-backend-calls",
+      "title": "Add a backend-free “Local-only settings” mode for Label Settings so the user can save and load label settings (including Prefix Mappings and all advanced layout fields) entirely from local device storage without requiring any backend calls.",
+      "reqIds": [
+        "REQ-41"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-update-the-label-settings-tab-ui-to-let-the-user-explicitly-choose-between-saving-to-the-backend-vs-saving-locally-and-make-the-current-mode-obvious-with-clear-english-user-facing-text",
+      "title": "Update the Label Settings tab UI to let the user explicitly choose between saving to the backend vs saving locally, and make the current mode obvious with clear English user-facing text.",
+      "reqIds": [
+        "REQ-42"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-modify-label-settings-loading-behavior-to-prefer-locally-persisted-label-settings-when-available-and-avoid-blocking-the-label-settings-screen-on-backend-fetch-when-local-settings-already-exist",
+      "title": "Modify label settings loading behavior to prefer locally persisted label settings when available, and avoid blocking the Label Settings screen on backend fetch when local settings already exist.",
+      "reqIds": [
+        "REQ-43"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-implement-local-only-save-logic-by-bypassing-actor-updatelabelsettings-and-updating-the-existing-persisted-label-settings-store-directly-while-keeping-validation-behavior-identical-to-backend-save",
+      "title": "Implement Local-only save logic by bypassing `actor.updateLabelSettings()` and updating the existing persisted label settings store directly, while keeping validation behavior identical to backend save.",
+      "reqIds": [
+        "REQ-44"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-remove-the-backend-save-sync-option-for-label-settings-and-make-label-settings-operate-in-local-only-mode-only-no-backend-fetch-no-backend-save-no-backend-refresh-ui-for-settings-update-any-label-settings-ui-copy-to-clearly-state-settings-are-saved-on-this-device",
+      "title": "Remove the backend save/sync option for Label Settings and make Label Settings operate in local-only mode only (no backend fetch, no backend save, no backend refresh UI for settings). Update any Label Settings UI copy to clearly state settings are saved on this device.",
+      "reqIds": [
+        "REQ-45"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-label-settings-export-import-functionality-that-works-entirely-offline-local-provide-an-export-action-that-downloads-the-current-locally-persisted-label-settings-as-a-json-file-and-an-import-action-that-allows-selecting-a-json-file-to-restore-label-settings-on-the-device-imported-settings-must-be-validated-with-the-same-mapping-validation-rules-used-during-save-and-on-success-must-immediately-update-the-persisted-store-and-the-on-screen-form-preview",
+      "title": "Add Label Settings export + import functionality that works entirely offline/local: provide an Export action that downloads the current locally persisted Label Settings as a JSON file, and an Import action that allows selecting a JSON file to restore Label Settings on the device. Imported settings must be validated with the same mapping validation rules used during save, and on success must immediately update the persisted store and the on-screen form/preview.",
+      "reqIds": [
+        "REQ-46"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-update-the-label-settings-label-preview-so-it-renders-a-true-readable-1-1-representation-of-the-printed-label-layout-matching-the-cpcl-output-similar-to-the-user-s-provided-example-screenshot-clean-white-label-centered-title-two-stacked-barcodes-with-human-readable-serial-text",
+      "title": "Update the Label Settings label preview so it renders a true, readable 1:1 representation of the printed label layout (matching the CPCL output), similar to the user’s provided example screenshot (clean white label, centered title, two stacked barcodes with human-readable serial text).",
+      "reqIds": [
+        "REQ-47"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-zoom-controls-to-the-label-preview-ui-in-label-settings-zoom-out-zoom-in-a-visible-zoom-percentage-and-a-reset-action-matching-the-interaction-pattern-shown-in-the-user-s-example-screenshot",
+      "title": "Add zoom controls to the Label Preview UI in Label Settings: zoom out, zoom in, a visible zoom percentage, and a Reset action, matching the interaction pattern shown in the user’s example screenshot.",
+      "reqIds": [
+        "REQ-48"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-extend-label-settings-with-per-element-layout-controls-so-the-user-can-configure-position-and-scale-for-1-title-2-barcode-1-3-serial-text-1-4-barcode-2-5-serial-text-2-each-element-must-have-independent-position-controls-and-independent-scale-controls",
+      "title": "Extend Label Settings with per-element layout controls so the user can configure position and scale for: (1) Title, (2) Barcode 1, (3) Serial text 1, (4) Barcode 2, (5) Serial text 2. Each element must have independent position controls and independent scale controls.",
+      "reqIds": [
+        "REQ-49"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-update-the-cpcl-generator-to-use-the-new-per-element-position-scale-settings-when-generating-cpcl-instead-of-relying-on-fixed-offsets-derived-from-titleposition-spacing-barcodeheight",
+      "title": "Update the CPCL generator to use the new per-element position/scale settings when generating CPCL, instead of relying on fixed offsets derived from titlePosition/spacing/barcodeHeight.",
+      "reqIds": [
+        "REQ-50"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-update-the-label-settings-data-model-and-persistence-to-include-the-new-per-element-layout-fields-while-keeping-existing-saved-settings-compatible-i-e-previously-saved-settings-still-load",
+      "title": "Update the label settings data model and persistence to include the new per-element layout fields while keeping existing saved settings compatible (i.e., previously saved settings still load).",
+      "reqIds": [
+        "REQ-51"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-update-the-default-label-settings-and-recommended-layout-so-a-48mm-x-30mm-label-prints-and-previews-with-a-clean-best-fit-layout-for-title-two-barcodes-two-serial-lines-no-clipping-overlap-using-the-existing-per-element-position-scale-fields-titlelayout-barcode1layout-serialtext1layout-barcode2layout-serialtext2layout",
+      "title": "Update the default Label Settings and recommended layout so a 48mm x 30mm label prints and previews with a clean, best-fit layout for title + two barcodes + two serial lines (no clipping/overlap) using the existing per-element position/scale fields (titleLayout, barcode1Layout, serialText1Layout, barcode2Layout, serialText2Layout).",
+      "reqIds": [
+        "REQ-52"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-improve-the-label-preview-barcode-rendering-so-the-preview-at-200-zoom-remains-crisp-and-accurately-represents-the-printed-barcode-area-rather-than-showing-a-low-fidelity-placeholder-pattern",
+      "title": "Improve the Label Preview barcode rendering so the preview at 200% zoom remains crisp and accurately represents the printed barcode area, rather than showing a low-fidelity placeholder pattern.",
+      "reqIds": [
+        "REQ-53"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-a-usb-connection-option-for-cpcl-printers-and-a-user-initiated-test-print-action-in-the-devices-tab-that-prints-a-small-sample-cpcl-label-using-the-current-label-settings-or-a-safe-built-in-default-if-settings-are-unavailable",
+      "title": "Add a USB connection option for CPCL printers and a user-initiated “Test Print” action in the Devices tab that prints a small sample CPCL label using the current label settings (or a safe built-in default if settings are unavailable).",
+      "reqIds": [
+        "REQ-54"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-update-the-scan-print-tab-two-step-serial-workflow-so-it-is-explicitly-optimized-for-barcode-scanner-only-input-1-autofocus-the-1st-serial-number-input-on-entry-reset-2-after-a-valid-1st-scan-play-the-success-sound-show-a-green-success-border-on-the-1st-input-and-move-focus-to-the-2nd-input-3-after-a-valid-2nd-scan-play-the-success-sound-show-a-green-success-border-on-the-2nd-input-and-immediately-proceed-to-auto-print",
+      "title": "Update the Scan & Print tab two-step serial workflow so it is explicitly optimized for barcode-scanner-only input: (1) autofocus the 1st Serial Number input on entry/reset, (2) after a valid 1st scan play the success sound, show a green success border on the 1st input, and move focus to the 2nd input, (3) after a valid 2nd scan play the success sound, show a green success border on the 2nd input, and immediately proceed to auto-print.",
+      "reqIds": [
+        "REQ-55"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-the-auto-print-step-in-the-scan-print-tab-so-that-after-a-valid-2nd-scan-the-app-actually-sends-the-generated-cpcl-payload-to-the-connected-printer-transport-via-the-existing-printer-service-cpcl-protocol-rather-than-only-logging-recording-history",
+      "title": "Fix the auto-print step in the Scan & Print tab so that after a valid 2nd scan the app actually sends the generated CPCL payload to the connected printer transport via the existing printer service (CPCL protocol), rather than only logging/recording history.",
+      "reqIds": [
+        "REQ-56"
+      ],
+      "version": 1
+    }
+  ],
+  "new_feature_requests": [
+    {
+      "id": "AR-1",
+      "summary": "Implement the full app end-to-end per the provided authoritative spec (frontend + Motoko backend, including auth/session, scan & print workflow, label settings + preview, devices, diagnostics/history/logs, sounds, keep-awake).",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-4",
+      "summary": "Fix Lock Screen auth: enforce real password validation (do not accept any non-empty password). Support configuring the correct password (e.g., 'swh1400') so unlocking reliably transitions into the app when the correct password is entered and blocks otherwise.",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-5",
+      "summary": "Rename Scan & Print UI field labels from “Left/Right” to “1st Serial Number” and “2nd Serial Number”.",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-6",
+      "summary": "Move the printer connection status indicator and the keep-awake (screen awake) toggle to the top-right corner next to the Lock button.",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-7",
+      "summary": "Add counters segmented by serial/label type based on scanned prefix (i.e., per-prefix or per-detected label type counts) in addition to existing aggregate counters.",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-8",
+      "summary": "Fix Label Settings save persistence: when user adds/edits prefix mappings in Label Settings and taps Save, changes must reliably persist (backend update succeeds, and UI reflects saved state after reload).",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-9",
+      "summary": "Add an option to support adding more label types beyond the current set (dualBand, triBand, newDualBand), including updating label type handling in label settings/prefix mappings, validation, and scan/print workflow to recognize additional types.",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-13",
+      "summary": "Explore/implement a backend-free mode: store Label Settings (including prefix mappings) locally on the Android tablet (e.g., localStorage/IndexedDB) so the app can load/save settings and operate without relying on the Motoko/IC backend (at least for settings persistence).",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-14",
+      "summary": "Add Label Settings export + import: provide a user-facing option to export current local-only Label Settings (including prefix mappings and advanced layout fields) to a file/string, and import it later to restore settings on the same or another device.",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-15",
+      "summary": "Improve/fix Label Settings 1:1 label preview so it accurately matches the printed CPCL output (preview currently looks bad / not true-to-print).",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-16",
+      "summary": "Extend Label Settings with additional per-element layout controls: barcode and serial number position + scale, and title position + scale (to support more precise label layout tuning).",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-17",
+      "summary": "Add USB printer connectivity option for CPCL printers (in addition to existing Bluetooth/USB support expectations), with UI to connect via USB and show connection status.",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-18",
+      "summary": "Add a dedicated “Test Print” button/action to print a sample CPCL label for verifying printer connection and label layout.",
+      "reqIds": [],
+      "status": "pending"
+    }
+  ],
+  "projectName": "Make Some Double!! Barcode & Label Printing System",
+  "clarification_mode": "instant",
+  "clarification_rounds": 0
+}
