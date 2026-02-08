@@ -1,7 +1,7 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-08T18:11:47.222Z",
+  "generatedAt": "2026-02-08T21:35:59.129Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
@@ -11,27 +11,27 @@
     "implemented": 2,
     "items": [
       {
-        "id": "REQ-55",
-        "summary": "Update the Scan & Print tab two-step serial workflow so it is explicitly optimized for barcode-scanner-only input: (1) autofocus the 1st Serial Number input on entry/reset, (2) after a valid 1st scan play the success sound, show a green success border on the 1st input, and move focus to the 2nd input, (3) after a valid 2nd scan play the success sound, show a green success border on the 2nd input, and immediately proceed to auto-print.",
+        "id": "REQ-57",
+        "summary": "Add the user-provided logo image to the AppShell header in the top-left, positioned immediately next to the app title text (“Make Some Double!!”). The logo must be left-aligned with the title, vertically centered, and sized appropriately for a tablet header without pushing the existing top-right controls (backend indicator, device controls, lock button) off-screen.",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/components/AppShell.tsx",
-          "frontend/src/tabs/ScanPrintTab.tsx"
+          "frontend/src/components/AppShell.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/components/AppShell.tsx",
-          "frontend/src/tabs/ScanPrintTab.tsx"
+          "frontend/src/components/AppShell.tsx"
         ]
       },
       {
-        "id": "REQ-56",
-        "summary": "Fix the auto-print step in the Scan & Print tab so that after a valid 2nd scan the app actually sends the generated CPCL payload to the connected printer transport via the existing printer service (CPCL protocol), rather than only logging/recording history.",
+        "id": "REQ-58",
+        "summary": "Add the provided logo image as a static frontend asset under frontend/public/assets/generated and reference it from the header logo element (do not load it via the backend).",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/tabs/ScanPrintTab.tsx"
+          "frontend/public/assets/generated/app-logo.dim_256x256.png",
+          "frontend/src/components/AppShell.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/tabs/ScanPrintTab.tsx"
+          "frontend/public/assets/generated/app-logo.dim_256x256.png",
+          "frontend/src/components/AppShell.tsx"
         ]
       }
     ]
@@ -41,8 +41,8 @@
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
+    "frontend/public/assets/generated/app-logo.dim_256x256.png",
     "frontend/src/components/AppShell.tsx",
-    "frontend/src/tabs/ScanPrintTab.tsx",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

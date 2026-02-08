@@ -2,11 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-update-the-scan-print-tab-two-step-serial-workflow-so-it-is-explicitly-optimized-for-barcode-scanner-only-input-1-autofocus-the-1st-serial-number-input-on-entry-reset-2-after-a-valid-1st-scan-play-the-success-sound-show-a-green-success-border-on-the-1st-input-and-move-focus-to-the-2nd-input-3-after-a-valid-2nd-scan-play-the-success-sound-show-a-green-success-border-on-the-2nd-input-and-immediately-proceed-to-auto-print",
-      "featureTitle": "Update the Scan & Print tab two-step serial workflow so it is explicitly optimized for barcode-scanner-only input: (1) autofocus the 1st Serial Number input on entry/reset, (2) after a valid 1st scan play the success sound, show a green success border on the 1st input, and move focus to the 2nd input, (3) after a valid 2nd scan play the success sound, show a green success border on the 2nd input, and immediately proceed to auto-print.",
+      "featureId": "feature-add-the-user-provided-logo-image-to-the-appshell-header-in-the-top-left-positioned-immediately-next-to-the-app-title-text-make-some-double-the-logo-must-be-left-aligned-with-the-title-vertically-centered-and-sized-appropriately-for-a-tablet-header-without-pushing-the-existing-top-right-controls-backend-indicator-device-controls-lock-button-off-screen",
+      "featureTitle": "Add the user-provided logo image to the AppShell header in the top-left, positioned immediately next to the app title text (“Make Some Double!!”). The logo must be left-aligned with the title, vertically centered, and sized appropriately for a tablet header without pushing the existing top-right controls (backend indicator, device controls, lock button) off-screen.",
       "files": [
-        "frontend/src/components/AppShell.tsx",
-        "frontend/src/tabs/ScanPrintTab.tsx"
+        "frontend/src/components/AppShell.tsx"
       ],
       "components": [
         "authorization@4.0.0",
@@ -17,15 +16,15 @@
         "github-export-icp-cli@1.0.0"
       ],
       "testIds": [
-        "REQ-55"
+        "REQ-57"
       ],
       "confidence": "high"
     },
     {
-      "featureId": "feature-fix-the-auto-print-step-in-the-scan-print-tab-so-that-after-a-valid-2nd-scan-the-app-actually-sends-the-generated-cpcl-payload-to-the-connected-printer-transport-via-the-existing-printer-service-cpcl-protocol-rather-than-only-logging-recording-history",
-      "featureTitle": "Fix the auto-print step in the Scan & Print tab so that after a valid 2nd scan the app actually sends the generated CPCL payload to the connected printer transport via the existing printer service (CPCL protocol), rather than only logging/recording history.",
+      "featureId": "feature-add-the-provided-logo-image-as-a-static-frontend-asset-under-frontend-public-assets-generated-and-reference-it-from-the-header-logo-element-do-not-load-it-via-the-backend",
+      "featureTitle": "Add the provided logo image as a static frontend asset under frontend/public/assets/generated and reference it from the header logo element (do not load it via the backend).",
       "files": [
-        "frontend/src/tabs/ScanPrintTab.tsx"
+        "frontend/src/components/AppShell.tsx"
       ],
       "components": [
         "authorization@4.0.0",
@@ -36,7 +35,7 @@
         "github-export-icp-cli@1.0.0"
       ],
       "testIds": [
-        "REQ-56"
+        "REQ-58"
       ],
       "confidence": "high"
     }

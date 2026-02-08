@@ -18,7 +18,14 @@ export default function AppShell() {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b border-border bg-card">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-foreground">Make Some Double!!</h1>
+          <div className="flex items-center gap-3">
+            <img 
+              src="/assets/generated/app-logo.dim_256x256.png" 
+              alt="Make Some Double logo" 
+              className="w-10 h-10 object-contain"
+            />
+            <h1 className="text-2xl font-bold text-foreground">Make Some Double!!</h1>
+          </div>
           <div className="flex items-center gap-4">
             <BackendAvailabilityIndicator />
             <HeaderDeviceControls />
