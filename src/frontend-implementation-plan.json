@@ -1,45 +1,6 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Add static logo image next to app title in AppShell header",
-  "requirements": [
-    {
-      "id": "REQ-57",
-      "summary": "Place the provided logo in the AppShell header next to the “Make Some Double!!” title with correct alignment, spacing, and without displacing right-side controls.",
-      "acceptanceCriteria": [
-        "Header shows a logo image to the left of the “Make Some Double!!” title text.",
-        "Logo and title are grouped together on the left side of the header; existing right-side controls remain on the right and remain visible.",
-        "Logo is visually aligned (vertically centered) with the title and has consistent spacing between logo and title.",
-        "Logo has appropriate accessibility attributes (e.g., non-empty alt text in English such as \"Make Some Double\" or \"App logo\").",
-        "No changes are made to any immutable frontend paths listed in SYSTEM_CONTEXT."
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/components/AppShell.tsx",
-          "operation": "modify",
-          "description": "Update the header layout to wrap the logo and title in a left-side flex group (logo + title), ensuring vertical centering, consistent gap, and that the right-side control cluster remains visible and right-aligned on tablet widths. Add an accessible <img> with non-empty English alt text."
-        }
-      ]
-    },
-    {
-      "id": "REQ-58",
-      "summary": "Add the provided logo image as a static generated asset and reference it from the header logo element.",
-      "acceptanceCriteria": [
-        "A logo file exists under frontend/public/assets/generated and is used by the header logo <img> (or equivalent) via a static path.",
-        "The app renders the logo correctly after a full hard refresh (asset served as part of the frontend build)."
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/public/assets/generated/app-logo.dim_256x256.png",
-          "operation": "create",
-          "description": "Add the generated logo asset file (app-logo.dim_256x256.png) as a static frontend asset to be served with the frontend build."
-        },
-        {
-          "path": "frontend/src/components/AppShell.tsx",
-          "operation": "modify",
-          "description": "Reference the static asset at frontend/public/assets/generated/app-logo.dim_256x256.png from the header logo <img> and size it appropriately for the existing header so it does not push the top-right controls off-screen."
-        }
-      ]
-    }
-  ]
+  "title": "Allow selecting each sound effect independently",
+  "requirements": []
 }

@@ -1,24 +1,39 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-08T21:35:59.126Z",
-  "summary": "AppShell header was updated to include a left-grouped logo image next to the unchanged title, with appropriate alt text and layout classes. However, the required static logo asset file under frontend/public/assets/generated does not appear to have been added in this diff.",
-  "missing_requirements": [
+  "generatedAt": "2026-02-08T23:03:30.039Z",
+  "summary": "Diff implements independent per-event sound selection by adding persisted sound settings (success/error/printComplete) in the sound system and exposing UI in DiagnosticsTab under a new “Sounds” section. No explicit BuildRequest requirements were listed beyond the title goal; implementation appears aligned with constraints/non-goals.",
+  "missing_requirements": [],
+  "hallucinated_features": [
     {
-      "id": "REQ-58",
-      "requirement": "Add the provided logo image as a static frontend asset under frontend/public/assets/generated and reference it from the header logo element (do not load it via the backend).",
-      "reason": "The header references `/assets/generated/app-logo.dim_256x256.png`, but the diff shows no added files, so the required static asset file is not evidenced as present under `frontend/public/assets/generated`.",
+      "description": "Added a global sound volume setting persisted alongside per-sound selections.",
+      "reason": "BuildRequest asks for selecting each sound effect independently, but does not request a volume control.",
       "evidence": [
-        "File diff summary: Added files: none",
-        "frontend/src/components/AppShell.tsx (references /assets/generated/app-logo.dim_256x256.png)"
+        "frontend/src/audio/soundSystem.ts (adds `volume: number`, default `volume: 70`, and checks `if (volume === 0) return`)",
+        "frontend/src/tabs/DiagnosticsTab.tsx (imports Slider; sound configuration UI implied by diff and summaries)"
+      ]
+    },
+    {
+      "description": "Added test-play functionality/UI for sounds (test buttons / play actions).",
+      "reason": "BuildRequest does not request test buttons or a test-play API; it only requests independent selection.",
+      "evidence": [
+        "frontend/src/tabs/DiagnosticsTab.tsx (imports `Play` icon and `playTestSound` from soundSystem)",
+        "frontend-file-summaries.txt (DiagnosticsTab described as including “test buttons”)"
+      ]
+    },
+    {
+      "description": "Implemented multiple synthesized beep/chime patterns via Web Audio API as selectable options (e.g., beep1/beep2/chime/ding, error1/error2/buzz/alert).",
+      "reason": "BuildRequest does not ask to add new sound options/patterns—only to allow independent selection per existing event type (success scan, error scan, print complete).",
+      "evidence": [
+        "frontend/src/audio/soundSystem.ts (adds multiple cases under `successSound`, `errorSound`, `printCompleteSound` using `playBeep`/`playBeepSequence`)"
       ]
     }
   ],
-  "hallucinated_features": [],
-  "confidence": 0.74,
+  "confidence": 0.72,
   "changed_files": [
     "frontend-file-summaries.txt",
-    "frontend/src/components/AppShell.tsx",
+    "frontend/src/audio/soundSystem.ts",
+    "frontend/src/tabs/DiagnosticsTab.tsx",
     "project_state.json"
   ]
 }

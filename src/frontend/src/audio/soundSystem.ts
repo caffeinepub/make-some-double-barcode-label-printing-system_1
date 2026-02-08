@@ -61,20 +61,99 @@ function playBeep(frequency: number, duration: number, volume: number) {
   }
 }
 
+// Play a sequence of beeps
+function playBeepSequence(sequence: Array<{ frequency: number; duration: number; delay: number }>, volume: number) {
+  sequence.forEach(({ frequency, duration, delay }) => {
+    setTimeout(() => playBeep(frequency, duration, volume), delay);
+  });
+}
+
 export function playSound(type: 'success' | 'error' | 'printComplete') {
-  const { volume } = useSoundStore.getState();
+  const { volume, successSound, errorSound, printCompleteSound } = useSoundStore.getState();
   
+  if (volume === 0) return;
+
   switch (type) {
     case 'success':
-      playBeep(800, 100, volume);
+      switch (successSound) {
+        case 'beep1':
+          playBeep(800, 100, volume);
+          break;
+        case 'beep2':
+          playBeep(1000, 80, volume);
+          break;
+        case 'chime':
+          playBeepSequence([
+            { frequency: 600, duration: 80, delay: 0 },
+            { frequency: 800, duration: 80, delay: 100 },
+          ], volume);
+          break;
+        case 'ding':
+          playBeep(1200, 120, volume);
+          break;
+        case 'none':
+          break;
+      }
       break;
+
     case 'error':
-      playBeep(400, 200, volume);
-      setTimeout(() => playBeep(300, 200, volume), 250);
+      switch (errorSound) {
+        case 'error1':
+          playBeepSequence([
+            { frequency: 400, duration: 200, delay: 0 },
+            { frequency: 300, duration: 200, delay: 250 },
+          ], volume);
+          break;
+        case 'error2':
+          playBeepSequence([
+            { frequency: 300, duration: 150, delay: 0 },
+            { frequency: 250, duration: 150, delay: 200 },
+            { frequency: 200, duration: 150, delay: 400 },
+          ], volume);
+          break;
+        case 'buzz':
+          playBeep(200, 300, volume);
+          break;
+        case 'alert':
+          playBeepSequence([
+            { frequency: 500, duration: 100, delay: 0 },
+            { frequency: 400, duration: 100, delay: 150 },
+            { frequency: 500, duration: 100, delay: 300 },
+          ], volume);
+          break;
+        case 'none':
+          break;
+      }
       break;
+
     case 'printComplete':
-      playBeep(600, 100, volume);
-      setTimeout(() => playBeep(800, 100, volume), 150);
+      switch (printCompleteSound) {
+        case 'success1':
+          playBeepSequence([
+            { frequency: 600, duration: 100, delay: 0 },
+            { frequency: 800, duration: 100, delay: 150 },
+          ], volume);
+          break;
+        case 'success2':
+          playBeepSequence([
+            { frequency: 700, duration: 80, delay: 0 },
+            { frequency: 900, duration: 80, delay: 100 },
+            { frequency: 1100, duration: 120, delay: 200 },
+          ], volume);
+          break;
+        case 'done':
+          playBeep(900, 200, volume);
+          break;
+        case 'fanfare':
+          playBeepSequence([
+            { frequency: 500, duration: 100, delay: 0 },
+            { frequency: 700, duration: 100, delay: 120 },
+            { frequency: 900, duration: 150, delay: 240 },
+          ], volume);
+          break;
+        case 'none':
+          break;
+      }
       break;
   }
 }

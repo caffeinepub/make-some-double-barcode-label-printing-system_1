@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "projectStateVersion": 37,
+  "projectStateVersion": 41,
   "summary": "Build “Make Some Double!!” Barcode & Label Printing System: an Android tablet web app (dark, touch/scanner-only) with React/TypeScript frontend supporting password-only local session auth, scan-to-auto-print CPCL label workflows, label settings with 1:1 preview, device connectivity, diagnostics/history/logs, sounds, and keep-awake — with Label Settings operating in Local-only mode (no backend dependency).",
   "architectural_notes": [
     "Platform: Android tablet web app; dark mode, touch-friendly, scanner-only UI (inputmode=none)",
@@ -22,10 +22,10 @@
     "Label Settings: saving prefix mappings via the Save action does not persist changes (user reports added prefix not saved).",
     "Label Settings: Tri Band label type is missing from the label type list (cannot select/assign triBand in prefix mappings as expected).",
     "Label Settings: Label Preview is not rendering 1:1 / does not accurately match the printed label layout (user reports preview looks bad vs expected).",
-    "Label Preview at 200% zoom shows barcodes poorly/incorrectly; needs improved rendering so preview matches printed output (esp. for 48x30mm label)."
+    "Label Preview at 200% zoom shows barcodes poorly/incorrectly; needs improved rendering so preview matches printed output (esp. for 48x30mm label).",
+    "App header logo: the displayed logo is not the user-requested/provided logo image; header must use the correct provided asset."
   ],
   "isFixRequest": false,
-  "imageRequirements": "## Required Images\n- App logo from the uploaded image, cropped/converted for web use (app-logo.dim_256x256.png)",
   "existing_features": [
     {
       "id": "feature-build-the-frontend-password-only-lock-screen-and-local-session-system-the-app-must-boot-into-a-locked-state-when-no-valid-local-session-exists-unlocking-creates-a-locally-persisted-session-with-expiry-locking-returns-the-app-to-the-locked-state-the-session-must-be-required-to-access-the-ui-submit-print-jobs-and-load-label-settings-and-must-be-forwarded-with-backend-calls-to-satisfy-backend-authorization",
@@ -458,6 +458,14 @@
         "REQ-58"
       ],
       "version": 1
+    },
+    {
+      "id": "feature-replace-the-current-appshell-header-logo-asset-with-the-user-uploaded-logo-image-9-png-keeping-the-existing-logo-path-used-by-the-app-assets-generated-app-logo-dim-256x256-png-so-the-header-displays-the-correct-logo-without-layout-changes",
+      "title": "Replace the current AppShell header logo asset with the user-uploaded logo (image-9.png), keeping the existing logo path used by the app (`/assets/generated/app-logo.dim_256x256.png`) so the header displays the correct logo without layout changes.",
+      "reqIds": [
+        "REQ-59"
+      ],
+      "version": 1
     }
   ],
   "new_feature_requests": [
@@ -542,6 +550,12 @@
     {
       "id": "AR-19",
       "summary": "Add an app logo in the top-left of the AppShell header, positioned next to the app title, using the user-provided logo image.",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-20",
+      "summary": "Allow the user to independently select/configure each sound effect (success scan, error scan, print complete) rather than a single/shared sound setting.",
       "reqIds": [],
       "status": "pending"
     }

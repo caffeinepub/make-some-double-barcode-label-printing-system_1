@@ -1,43 +1,4 @@
 {
   "kind": "feature_evidence_report",
-  "features": [
-    {
-      "featureId": "feature-add-the-user-provided-logo-image-to-the-appshell-header-in-the-top-left-positioned-immediately-next-to-the-app-title-text-make-some-double-the-logo-must-be-left-aligned-with-the-title-vertically-centered-and-sized-appropriately-for-a-tablet-header-without-pushing-the-existing-top-right-controls-backend-indicator-device-controls-lock-button-off-screen",
-      "featureTitle": "Add the user-provided logo image to the AppShell header in the top-left, positioned immediately next to the app title text (“Make Some Double!!”). The logo must be left-aligned with the title, vertically centered, and sized appropriately for a tablet header without pushing the existing top-right controls (backend indicator, device controls, lock button) off-screen.",
-      "files": [
-        "frontend/src/components/AppShell.tsx"
-      ],
-      "components": [
-        "authorization@4.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0"
-      ],
-      "testIds": [
-        "REQ-57"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-add-the-provided-logo-image-as-a-static-frontend-asset-under-frontend-public-assets-generated-and-reference-it-from-the-header-logo-element-do-not-load-it-via-the-backend",
-      "featureTitle": "Add the provided logo image as a static frontend asset under frontend/public/assets/generated and reference it from the header logo element (do not load it via the backend).",
-      "files": [
-        "frontend/src/components/AppShell.tsx"
-      ],
-      "components": [
-        "authorization@4.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0"
-      ],
-      "testIds": [
-        "REQ-58"
-      ],
-      "confidence": "high"
-    }
-  ]
+  "features": []
 }

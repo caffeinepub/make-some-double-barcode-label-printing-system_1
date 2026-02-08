@@ -1,12 +1,11 @@
 # Specification
 
 ## Summary
-**Goal:** Add the user-provided app logo to the top-left of the AppShell header, immediately next to the “Make Some Double!!” title, without disrupting existing right-side header controls.
+**Goal:** Let users choose the sound effect used for each existing sound event (success scan, error scan, print complete) independently.
 
 **Planned changes:**
-- Add the provided logo image as a static asset under `frontend/public/assets/generated` and reference it via a static path (no backend loading).
-- Update the AppShell header layout so the logo and title are grouped on the left, vertically centered, with consistent spacing.
-- Ensure the logo is sized appropriately for a tablet header and does not push the existing top-right controls (backend indicator, device controls, lock button) off-screen.
-- Add accessibility attributes for the logo (non-empty English alt text such as “Make Some Double” or “App logo”).
+- Update the settings UI to provide separate sound selection controls for: success scan, error scan, and print complete.
+- Persist and load per-event sound selections so each event plays its chosen sound.
+- Ensure no new sound event types are introduced and sound playback remains internal (no external audio libraries).
 
-**User-visible outcome:** The header shows a properly sized, aligned logo directly next to the “Make Some Double!!” title on the left, while all existing controls remain visible on the right.
+**User-visible outcome:** In settings, users can assign different sounds to success scans, error scans, and print completion, and the app will play the selected sound for each event.

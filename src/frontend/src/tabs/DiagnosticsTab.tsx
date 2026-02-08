@@ -259,14 +259,14 @@ export default function DiagnosticsTab() {
                 <div className="flex items-center justify-between">
                   <Label htmlFor="volume">Volume</Label>
                   <span className="text-sm text-muted-foreground">
-                    {Math.round(settings.volume * 100)}%
+                    {settings.volume}%
                   </span>
                 </div>
                 <Slider
                   id="volume"
                   min={0}
-                  max={1}
-                  step={0.1}
+                  max={100}
+                  step={5}
                   value={[settings.volume]}
                   onValueChange={([value]) => updateSettings({ volume: value })}
                   className="w-full"
@@ -274,18 +274,20 @@ export default function DiagnosticsTab() {
               </div>
 
               <div className="space-y-3">
-                <Label>Success Sound</Label>
+                <Label>Success Scan Sound</Label>
                 <div className="flex gap-2">
                   <Select
                     value={settings.successSound}
-                    onValueChange={(value: any) => updateSettings({ successSound: value })}
+                    onValueChange={(value: string) => updateSettings({ successSound: value })}
                   >
                     <SelectTrigger className="flex-1">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="beep">Beep</SelectItem>
+                      <SelectItem value="beep1">Beep 1</SelectItem>
+                      <SelectItem value="beep2">Beep 2</SelectItem>
                       <SelectItem value="chime">Chime</SelectItem>
+                      <SelectItem value="ding">Ding</SelectItem>
                       <SelectItem value="none">None</SelectItem>
                     </SelectContent>
                   </Select>
@@ -300,16 +302,18 @@ export default function DiagnosticsTab() {
               </div>
 
               <div className="space-y-3">
-                <Label>Error Sound</Label>
+                <Label>Error Scan Sound</Label>
                 <div className="flex gap-2">
                   <Select
                     value={settings.errorSound}
-                    onValueChange={(value: any) => updateSettings({ errorSound: value })}
+                    onValueChange={(value: string) => updateSettings({ errorSound: value })}
                   >
                     <SelectTrigger className="flex-1">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="error1">Error 1</SelectItem>
+                      <SelectItem value="error2">Error 2</SelectItem>
                       <SelectItem value="buzz">Buzz</SelectItem>
                       <SelectItem value="alert">Alert</SelectItem>
                       <SelectItem value="none">None</SelectItem>
@@ -330,14 +334,16 @@ export default function DiagnosticsTab() {
                 <div className="flex gap-2">
                   <Select
                     value={settings.printCompleteSound}
-                    onValueChange={(value: any) => updateSettings({ printCompleteSound: value })}
+                    onValueChange={(value: string) => updateSettings({ printCompleteSound: value })}
                   >
                     <SelectTrigger className="flex-1">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="success">Success</SelectItem>
+                      <SelectItem value="success1">Success 1</SelectItem>
+                      <SelectItem value="success2">Success 2</SelectItem>
                       <SelectItem value="done">Done</SelectItem>
+                      <SelectItem value="fanfare">Fanfare</SelectItem>
                       <SelectItem value="none">None</SelectItem>
                     </SelectContent>
                   </Select>
