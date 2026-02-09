@@ -1,39 +1,56 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-08T23:03:30.039Z",
-  "summary": "Diff implements independent per-event sound selection by adding persisted sound settings (success/error/printComplete) in the sound system and exposing UI in DiagnosticsTab under a new “Sounds” section. No explicit BuildRequest requirements were listed beyond the title goal; implementation appears aligned with constraints/non-goals.",
-  "missing_requirements": [],
-  "hallucinated_features": [
+  "generatedAt": "2026-02-09T07:14:16.558Z",
+  "summary": "Diff adds Scan & Print–specific error formatting utilities, improves IC error cleaning (including canister-stopped detection), introduces a persisted log store, and adjusts backend print-job mutation error handling. ScanPrintTab is modified (truncated) and file summaries claim an offline-first print sequence, but the truncation prevents confirming key acceptance criteria end-to-end.",
+  "missing_requirements": [
     {
-      "description": "Added a global sound volume setting persisted alongside per-sound selections.",
-      "reason": "BuildRequest asks for selecting each sound effect independently, but does not request a volume control.",
+      "id": "REQ-71",
+      "requirement": "When backend is stopped/unavailable, a successful 2nd scan must still print via the connected printer; backend submission must not be required for printing success; local diagnostics counters and local print history (including CPCL payload) must still update even when backend calls fail; backend failure must not flip the 2nd serial field from success to error if print send succeeds.",
+      "reason": "ScanPrintTab implementation is truncated, so it cannot be verified that (a) printing is attempted and succeeds without backend availability, (b) UI field success state is preserved when backend submission fails, and (c) local diagnostics + local print history update occurs even when backend calls fail.",
       "evidence": [
-        "frontend/src/audio/soundSystem.ts (adds `volume: number`, default `volume: 70`, and checks `if (volume === 0) return`)",
-        "frontend/src/tabs/DiagnosticsTab.tsx (imports Slider; sound configuration UI implied by diff and summaries)"
+        "frontend/src/tabs/ScanPrintTab.tsx (truncated)"
       ]
     },
     {
-      "description": "Added test-play functionality/UI for sounds (test buttons / play actions).",
-      "reason": "BuildRequest does not request test buttons or a test-play API; it only requests independent selection.",
+      "id": "REQ-72",
+      "requirement": "Reorder printing sequence: validate → generate CPCL → send to printer → then attempt backend submission as best-effort non-blocking; if printer send fails show print failure and do not reset; if printer send succeeds but backend submission fails still show print-complete/reset and record only as warning/info; no modal dialogs required.",
+      "reason": "Although utilities/logging exist to support this behavior, the core ScanPrintTab logic that orchestrates sequencing and UI states is truncated, so the required ordering, reset behavior, and error-state behavior cannot be confirmed from the provided diff summary.",
       "evidence": [
-        "frontend/src/tabs/DiagnosticsTab.tsx (imports `Play` icon and `playTestSound` from soundSystem)",
-        "frontend-file-summaries.txt (DiagnosticsTab described as including “test buttons”)"
+        "frontend/src/tabs/ScanPrintTab.tsx (truncated)",
+        "frontend/src/utils/scanPrintErrors.ts",
+        "frontend/src/state/logStore.ts"
       ]
     },
     {
-      "description": "Implemented multiple synthesized beep/chime patterns via Web Audio API as selectable options (e.g., beep1/beep2/chime/ding, error1/error2/buzz/alert).",
-      "reason": "BuildRequest does not ask to add new sound options/patterns—only to allow independent selection per existing event type (success scan, error scan, print complete).",
+      "id": "REQ-73",
+      "requirement": "Replace raw replica rejection details in Scan & Print failures with clear English; for IC0508/canister-stopped, show backend unavailable message and that printing can continue locally; do not show long reject JSON blobs in Scan & Print main alert area.",
+      "reason": "Error formatting helpers were added/updated, but due to ScanPrintTab truncation it cannot be verified that Scan & Print’s displayed banner/alert no longer renders raw replica rejection blobs and instead uses the new concise messages in all backend-call failure paths.",
       "evidence": [
-        "frontend/src/audio/soundSystem.ts (adds multiple cases under `successSound`, `errorSound`, `printCompleteSound` using `playBeep`/`playBeepSequence`)"
+        "frontend/src/tabs/ScanPrintTab.tsx (truncated)",
+        "frontend/src/utils/icErrors.ts",
+        "frontend/src/utils/scanPrintErrors.ts",
+        "frontend/src/hooks/useQueries.ts"
       ]
     }
   ],
-  "confidence": 0.72,
+  "hallucinated_features": [
+    {
+      "description": "Added a persisted, capped (1000 entries) system log store with severity levels (info/warn/error).",
+      "reason": "The BuildRequest focuses on offline Scan & Print flow sequencing and error UX; it does not request implementing a new persisted logging subsystem.",
+      "evidence": [
+        "frontend/src/state/logStore.ts"
+      ]
+    }
+  ],
+  "confidence": 0.56,
   "changed_files": [
     "frontend-file-summaries.txt",
-    "frontend/src/audio/soundSystem.ts",
-    "frontend/src/tabs/DiagnosticsTab.tsx",
+    "frontend/src/hooks/useQueries.ts",
+    "frontend/src/state/logStore.ts",
+    "frontend/src/tabs/ScanPrintTab.tsx",
+    "frontend/src/utils/icErrors.ts",
+    "frontend/src/utils/scanPrintErrors.ts",
     "project_state.json"
   ]
 }

@@ -1,4 +1,66 @@
 {
   "kind": "feature_evidence_report",
-  "features": []
+  "features": [
+    {
+      "featureId": "feature-update-the-scan-print-auto-print-flow-so-that-a-successful-2nd-scan-prints-via-the-connected-printer-even-when-the-internet-computer-backend-is-unavailable-stopped-ic0508-backend-submission-must-not-be-required-for-printing-success",
+      "featureTitle": "Update the Scan & Print auto-print flow so that a successful 2nd scan prints via the connected printer even when the Internet Computer backend is unavailable/stopped (IC0508). Backend submission must not be required for printing success.",
+      "files": [
+        "frontend/src/tabs/ScanPrintTab.tsx",
+        "frontend/src/utils/scanPrintErrors.ts"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-71"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-reorder-and-harden-the-scan-print-printing-sequence-to-prevent-backend-submission-failures-from-surfacing-as-the-primary-error-when-the-printer-send-succeeds-specifically-1-validate-scans-2-generate-cpcl-3-send-cpcl-to-the-printer-4-attempt-backend-submission-only-as-a-best-effort-non-blocking-step-e-g-for-remote-history-and-if-it-fails-log-it-and-show-a-small-non-blocking-notice-instead-of-failing-the-scan-print-result",
+      "featureTitle": "Reorder and harden the Scan & Print printing sequence to prevent backend submission failures from surfacing as the primary error when the printer send succeeds. Specifically: (1) validate scans, (2) generate CPCL, (3) send CPCL to the printer, (4) attempt backend submission only as a best-effort non-blocking step (e.g., for remote history), and if it fails, log it and show a small non-blocking notice instead of failing the scan/print result.",
+      "files": [
+        "frontend/src/state/logStore.ts",
+        "frontend/src/tabs/ScanPrintTab.tsx"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-72"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-replace-raw-replica-rejection-details-shown-to-the-user-during-printing-failures-with-clear-english-messages-for-ic0508-canister-stopped-errors-show-a-short-message-that-the-backend-is-unavailable-and-that-printing-can-continue-locally-if-the-printer-is-connected-do-not-display-long-reject-json-blobs-in-the-scan-print-error-banner",
+      "featureTitle": "Replace raw replica rejection details shown to the user during printing failures with clear English messages. For IC0508/canister-stopped errors, show a short message that the backend is unavailable and that printing can continue locally (if the printer is connected). Do not display long reject JSON blobs in the Scan & Print error banner.",
+      "files": [
+        "frontend/src/hooks/useQueries.ts",
+        "frontend/src/tabs/ScanPrintTab.tsx",
+        "frontend/src/utils/icErrors.ts"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-73"
+      ],
+      "confidence": "high"
+    }
+  ]
 }

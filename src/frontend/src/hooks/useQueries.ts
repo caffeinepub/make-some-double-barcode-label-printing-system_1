@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useActor } from './useActor';
 import type { PrintJob } from '../backend';
 import { useBackendAvailability } from '../state/backendAvailabilityStore';
-import { isCanisterStoppedError, getCanisterStoppedMessage } from '../utils/icErrors';
+import { isCanisterStoppedError, formatICError } from '../utils/icErrors';
 
 export function useSubmitPrintJob() {
   const { actor } = useActor();
@@ -21,8 +21,18 @@ export function useSubmitPrintJob() {
     },
     onError: (error: any) => {
       if (isCanisterStoppedError(error)) {
-        markStopped(getCanisterStoppedMessage());
+        markStopped(formatICError(error));
       }
+      // Re-throw with formatted message for caller
+      const formattedMessage = formatICError(error);
+      const formattedError = new Error(formattedMessage);
+      // Preserve original error properties for detection
+      Object.assign(formattedError, {
+        reject_code: error?.reject_code,
+        error_code: error?.error_code,
+        reject_message: error?.reject_message,
+      });
+      throw formattedError;
     },
   });
 }
@@ -59,7 +69,7 @@ export function useIncreasePrintCount() {
     },
     onError: (error: any) => {
       if (isCanisterStoppedError(error)) {
-        markStopped(getCanisterStoppedMessage());
+        markStopped(formatICError(error));
       }
     },
   });

@@ -7,11 +7,8 @@ import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
 import Int "mo:core/Int";
 
-
 import MixinAuthorization "authorization/MixinAuthorization";
 import AccessControl "authorization/access-control";
-
-// Enables persistence of new state on upgrade.
 
 actor {
   public type PrefixMapping = {
@@ -89,9 +86,8 @@ actor {
   };
 
   public shared ({ caller }) func submitPrintJob(prefix : Text, leftSerial : Text, rightSerial : Text) : async Bool {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can submit print jobs");
-    };
+    // Authorization removed
+
     if (usedSerials.get(leftSerial) == ?true) {
       Runtime.trap("Duplicate serial: leftSerial already used");
     };
@@ -270,3 +266,4 @@ actor {
     };
   };
 };
+

@@ -21,8 +21,8 @@ const useLogStore = create<LogState>()(
       addLog: (level, message) => set((state) => ({
         logs: [
           { timestamp: Date.now(), level, message },
-          ...state.logs
-        ].slice(0, 500) // Keep last 500 logs
+          ...state.logs,
+        ].slice(0, 1000), // Keep last 1000 logs
       })),
     }),
     {
@@ -31,7 +31,13 @@ const useLogStore = create<LogState>()(
   )
 );
 
-export const useLogs = () => useLogStore();
 export const addLog = (level: LogLevel, message: string) => {
   useLogStore.getState().addLog(level, message);
 };
+
+export const useLogs = () => {
+  const logs = useLogStore((state) => state.logs);
+  return { logs };
+};
+
+export default useLogStore;

@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Save, Plus, Trash2, X, Download, Upload } from 'lucide-react';
 import { useLabelSettings, updatePersistedSettings } from '../state/labelSettingsStore';
 import LabelPreview from '../printing/LabelPreview';
+import SoundEffectsSettings from '../components/SoundEffectsSettings';
 import { toast } from 'sonner';
 import { getAllLabelTypes, getLabelTypeDisplayName } from '../utils/labelTypes';
 import type { LayoutSettings } from '../backend';
@@ -222,9 +223,8 @@ export default function LabelSettingsTab() {
     }
   };
 
-  // Get all label types and extract just the value strings
+  // Get all label types
   const allLabelTypeInfos = getAllLabelTypes(prefixMappings, customTypes);
-  const allLabelTypes = allLabelTypeInfos.map(info => info.value);
 
   if (isLoading) {
     return <div className="p-6">Loading settings...</div>;
@@ -248,6 +248,9 @@ export default function LabelSettingsTab() {
           <LabelPreview settings={settings} />
         </CardContent>
       </Card>
+
+      {/* Sound Effects Settings */}
+      <SoundEffectsSettings />
 
       {/* Basic Settings */}
       <Card>
@@ -540,7 +543,8 @@ export default function LabelSettingsTab() {
                 <Input
                   value={prefix}
                   onChange={(e) => updatePrefixMapping(index, 'prefix', e.target.value)}
-                  placeholder="e.g., SSV"
+                  placeholder="e.g., 55Y"
+                  className="font-mono"
                 />
               </div>
               <div className="flex-1 space-y-2">
@@ -570,7 +574,7 @@ export default function LabelSettingsTab() {
                 />
               </div>
               <Button
-                variant="destructive"
+                variant="outline"
                 size="icon"
                 onClick={() => removePrefixMapping(index)}
               >
@@ -578,8 +582,8 @@ export default function LabelSettingsTab() {
               </Button>
             </div>
           ))}
-          <Button onClick={addPrefixMapping} variant="outline" className="w-full">
-            <Plus className="w-4 h-4 mr-2" />
+          <Button onClick={addPrefixMapping} variant="outline" className="w-full gap-2">
+            <Plus className="w-4 h-4" />
             Add Prefix Mapping
           </Button>
         </CardContent>
@@ -594,7 +598,7 @@ export default function LabelSettingsTab() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <Input
               value={newCustomType}
               onChange={(e) => setNewCustomType(e.target.value)}
@@ -606,15 +610,15 @@ export default function LabelSettingsTab() {
                 }
               }}
             />
-            <Button onClick={addCustomType}>
-              <Plus className="w-4 h-4 mr-2" />
+            <Button onClick={addCustomType} className="gap-2">
+              <Plus className="w-4 h-4" />
               Add
             </Button>
           </div>
           {customTypes.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {customTypes.map((type) => (
-                <Badge key={type} variant="secondary" className="gap-2">
+                <Badge key={type} variant="secondary" className="gap-2 px-3 py-1">
                   {type}
                   <button
                     onClick={() => removeCustomType(type)}
@@ -629,18 +633,18 @@ export default function LabelSettingsTab() {
         </CardContent>
       </Card>
 
-      {/* Action Buttons */}
+      {/* Save and Export/Import */}
       <div className="flex gap-3">
-        <Button onClick={handleSave} className="flex-1 h-14 text-lg">
-          <Save className="w-5 h-5 mr-2" />
+        <Button onClick={handleSave} className="flex-1 gap-2">
+          <Save className="w-4 h-4" />
           Save Settings
         </Button>
-        <Button onClick={handleExport} variant="outline" className="h-14 px-6">
-          <Download className="w-5 h-5 mr-2" />
+        <Button onClick={handleExport} variant="outline" className="gap-2">
+          <Download className="w-4 h-4" />
           Export
         </Button>
-        <Button onClick={handleImportClick} variant="outline" className="h-14 px-6">
-          <Upload className="w-5 h-5 mr-2" />
+        <Button onClick={handleImportClick} variant="outline" className="gap-2">
+          <Upload className="w-4 h-4" />
           Import
         </Button>
         <input

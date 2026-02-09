@@ -1,30 +1,68 @@
 {
   "kind": "build_request",
-  "title": "Allow selecting each sound effect independently",
-  "priority": "normal",
-  "requirements": [],
+  "title": "Make Scan & Print work offline by removing backend dependency and improving backend-unavailable error UX",
+  "priority": "high",
+  "requirements": [
+    {
+      "id": "REQ-71",
+      "text": "Update the Scan & Print auto-print flow so that a successful 2nd scan prints via the connected printer even when the Internet Computer backend is unavailable/stopped (IC0508). Backend submission must not be required for printing success.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-5"
+        ],
+        "quotes": [
+          "After 2nd scan it said it was good scan but then error. On top it's say about backend I thought we tried avoid involving that"
+        ]
+      },
+      "acceptanceCriteria": [
+        "When the backend canister is stopped/unavailable, scanning 1st serial (valid prefix) and scanning 2nd serial (matching type) still generates CPCL and sends it to the printer transport successfully.",
+        "A backend failure must not flip the 2nd serial field from success to error if the print send succeeds.",
+        "Print success must still update local diagnostics counters and local print history, including CPCL payload, even when backend calls fail."
+      ]
+    },
+    {
+      "id": "REQ-72",
+      "text": "Reorder and harden the Scan & Print printing sequence to prevent backend submission failures from surfacing as the primary error when the printer send succeeds. Specifically: (1) validate scans, (2) generate CPCL, (3) send CPCL to the printer, (4) attempt backend submission only as a best-effort non-blocking step (e.g., for remote history), and if it fails, log it and show a small non-blocking notice instead of failing the scan/print result.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-5"
+        ]
+      },
+      "acceptanceCriteria": [
+        "If CPCL sending fails, the UI shows a print failure error state and does not reset the form.",
+        "If CPCL sending succeeds but backend submission fails, the UI still shows print complete behavior (success state, reset) and the failure is recorded only as a warning/info log (not as the main destructive error banner).",
+        "The app must remain scanner-only friendly: no modal dialogs required to dismiss before scanning the next label."
+      ]
+    },
+    {
+      "id": "REQ-73",
+      "text": "Replace raw replica rejection details shown to the user during printing failures with clear English messages. For IC0508/canister-stopped errors, show a short message that the backend is unavailable and that printing can continue locally (if the printer is connected). Do not display long reject JSON blobs in the Scan & Print error banner.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-5"
+        ]
+      },
+      "acceptanceCriteria": [
+        "When an IC0508-style error occurs during any Scan & Print backend call, the user-facing error/notice text is concise and readable (no request IDs, reject code dumps, or embedded JSON).",
+        "The existing header backend availability badge may still appear, but Scan & Print must not show the full replica error blob in its main alert area."
+      ]
+    }
+  ],
   "constraints": [
-    "Do not edit files under frontend/src/main.tsx or any other paths listed in frontend.immutablePaths; compose using editable components instead.",
-    "Keep all backend logic in the single Motoko actor (backend/main.mo). Create backend/migration.mo only if state migration is required by changes.",
-    "Use English for all user-facing UI text."
+    "Do not edit files under frontend/src/components/ui or any path listed in frontend.immutablePaths.",
+    "Keep Label Settings operating in local-only mode (no backend dependency for saving/loading settings).",
+    "Do not add new backend services or external databases; the app must remain a single Motoko actor backend (even if printing no longer requires it)."
   ],
   "nonGoals": [
-    "Do not add new sound event types beyond success scan, error scan, and print complete.",
-    "Do not integrate external audio libraries or third-party services for sound playback.",
-    "Do not change printer/scanning workflows as part of this request."
+    "Fixing/restarting the stopped canister itself (IC0508) as part of this change.",
+    "Adding new authentication methods beyond the existing password session/Internet Identity integration.",
+    "Changing label layout/CPCL formatting (except as needed to ensure offline printing still uses the same generated CPCL as online printing)."
   ],
   "imageRequirements": {
     "required": [],
     "edits": []
-  },
-  "userProfileUpdate": {
-    "goalsToAdd": [],
-    "goalsToRemove": [],
-    "preferencesToAdd": [],
-    "preferencesToRemove": [],
-    "miscToAdd": [],
-    "miscToRemove": [],
-    "fieldsToSet": {},
-    "fieldsToDelete": []
   }
 }

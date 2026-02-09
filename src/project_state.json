@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "projectStateVersion": 41,
+  "projectStateVersion": 51,
   "summary": "Build “Make Some Double!!” Barcode & Label Printing System: an Android tablet web app (dark, touch/scanner-only) with React/TypeScript frontend supporting password-only local session auth, scan-to-auto-print CPCL label workflows, label settings with 1:1 preview, device connectivity, diagnostics/history/logs, sounds, and keep-awake — with Label Settings operating in Local-only mode (no backend dependency).",
   "architectural_notes": [
     "Platform: Android tablet web app; dark mode, touch-friendly, scanner-only UI (inputmode=none)",
@@ -17,15 +17,16 @@
   "known_issues": [
     "Lock Screen currently accepts any non-empty password (no real password validation), which can make the app appear stuck/not loading when the unlock action/input handling fails or when expecting a specific password like 'swh1400'.",
     "App runtime crash: React hook error `usePasswordSession must be used within PasswordSessionProvider` thrown in `App`, indicating missing/incorrect provider wrapping and preventing the UI from rendering.",
-    "Console noise during draft environment: `Unchecked runtime.lastError: No tab with id ...` and `draft-editor:error disallowed origin ...` messages appear (likely from extension/editor embed), plus unused preloaded font warnings.",
     "Counters section is missing on the Scan & Print main screen (no per-serial/label-type counter cards are displayed as expected).",
     "Label Settings: saving prefix mappings via the Save action does not persist changes (user reports added prefix not saved).",
     "Label Settings: Tri Band label type is missing from the label type list (cannot select/assign triBand in prefix mappings as expected).",
     "Label Settings: Label Preview is not rendering 1:1 / does not accurately match the printed label layout (user reports preview looks bad vs expected).",
     "Label Preview at 200% zoom shows barcodes poorly/incorrectly; needs improved rendering so preview matches printed output (esp. for 48x30mm label).",
-    "App header logo: the displayed logo is not the user-requested/provided logo image; header must use the correct provided asset."
+    "App header logo: the displayed logo is not the user-requested/provided logo image; header must use the correct provided asset.",
+    "Scan & Print: barcode scans sometimes only partially populate the input and focus jumps to the 2nd serial box mid-scan.",
+    "Scan & Print: after both barcodes initially show as good/valid, when printing starts the 2nd scan sometimes flips to bad/invalid (state/regression during print transition)."
   ],
-  "isFixRequest": false,
+  "isFixRequest": true,
   "existing_features": [
     {
       "id": "feature-build-the-frontend-password-only-lock-screen-and-local-session-system-the-app-must-boot-into-a-locked-state-when-no-valid-local-session-exists-unlocking-creates-a-locally-persisted-session-with-expiry-locking-returns-the-app-to-the-locked-state-the-session-must-be-required-to-access-the-ui-submit-print-jobs-and-load-label-settings-and-must-be-forwarded-with-backend-calls-to-satisfy-backend-authorization",
@@ -466,6 +467,102 @@
         "REQ-59"
       ],
       "version": 1
+    },
+    {
+      "id": "feature-replace-the-existing-appshell-header-logo-image-asset-with-the-user-uploaded-photo-while-keeping-the-existing-logo-url-path-used-by-the-app-assets-generated-app-logo-dim-256x256-png-the-logo-must-be-served-as-a-static-frontend-asset-not-via-the-backend",
+      "title": "Replace the existing AppShell header logo image asset with the user-uploaded photo, while keeping the existing logo URL path used by the app (`/assets/generated/app-logo.dim_256x256.png`). The logo must be served as a static frontend asset (not via the backend).",
+      "reqIds": [
+        "REQ-60"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-adjust-the-appshell-header-logo-sizing-and-styling-so-the-new-logo-fits-perfectly-next-to-the-make-some-double-title-on-tablet-screens-without-causing-layout-overflow-or-pushing-the-top-right-header-controls-backend-indicator-device-controls-lock-button-off-screen",
+      "title": "Adjust the AppShell header logo sizing and styling so the new logo fits perfectly next to the “Make Some Double!!” title on tablet screens without causing layout overflow or pushing the top-right header controls (backend indicator, device controls, lock button) off-screen.",
+      "reqIds": [
+        "REQ-61"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-update-the-appshell-header-logo-styling-so-the-logo-is-displayed-inside-a-square-frame-while-preserving-the-full-image-object-contain-without-pushing-the-top-right-header-controls-off-screen-keep-the-logo-url-path-unchanged-assets-generated-app-logo-dim-256x256-png",
+      "title": "Update the AppShell header logo styling so the logo is displayed inside a square frame while preserving the full image (object-contain), without pushing the top-right header controls off-screen. Keep the logo URL path unchanged: `/assets/generated/app-logo.dim_256x256.png`.",
+      "reqIds": [
+        "REQ-63"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-the-scan-print-barcode-scanner-input-handling-so-a-single-barcode-scan-fully-populates-only-the-currently-active-serial-input-and-focus-does-not-jump-to-the-2nd-serial-input-mid-scan",
+      "title": "Fix the Scan & Print barcode-scanner input handling so a single barcode scan fully populates only the currently active serial input and focus does not jump to the 2nd serial input mid-scan.",
+      "reqIds": [
+        "REQ-64"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-add-a-clear-button-on-the-scan-print-main-screen-that-clears-both-serial-number-input-boxes-and-fully-resets-the-scan-state-step-detected-prefix-type-validation-borders-printing-state-and-error-banner-then-autofocuses-the-1st-serial-number-input",
+      "title": "Add a Clear button on the Scan & Print main screen that clears both serial number input boxes and fully resets the scan state (step, detected prefix/type, validation borders, printing state, and error banner), then autofocuses the 1st Serial Number input.",
+      "reqIds": [
+        "REQ-66"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-move-the-sound-configuration-ui-out-of-diagnostics-and-into-the-label-settings-tab-and-update-the-sound-system-to-allow-users-to-use-their-own-custom-sound-files-for-success-scan-error-scan-and-print-complete-persisted-locally",
+      "title": "Move the Sound Configuration UI out of Diagnostics and into the Label Settings tab, and update the sound system to allow users to use their own custom sound files for success scan, error scan, and print complete (persisted locally).",
+      "reqIds": [
+        "REQ-67"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-the-scan-print-scanner-input-completion-handling-so-that-a-single-physical-scan-cannot-trigger-multiple-validations-debounce-timer-enter-tab-keydown-that-overwrite-each-other-especially-during-the-transition-into-the-printing-state",
+      "title": "Fix the Scan & Print scanner input completion handling so that a single physical scan cannot trigger multiple validations (debounce timer + Enter/Tab keydown) that overwrite each other, especially during the transition into the “Printing…” state.",
+      "reqIds": [
+        "REQ-68"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-normalize-scanned-serial-input-before-prefix-detection-and-validation-to-reduce-false-unknown-prefix-errors-caused-by-scanner-suffixes-whitespace-non-printable-characters",
+      "title": "Normalize scanned serial input before prefix detection and validation to reduce false 'Unknown prefix' errors caused by scanner suffixes/whitespace/non-printable characters.",
+      "reqIds": [
+        "REQ-69"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-harden-the-scan-print-printing-transition-state-so-late-arriving-input-events-cannot-mutate-scan-state-after-printing-begins-e-g-an-extra-onchange-onkeydown-fired-by-the-scanner",
+      "title": "Harden the Scan & Print printing transition state so late-arriving input events cannot mutate scan state after printing begins (e.g., an extra onChange/onKeyDown fired by the scanner).",
+      "reqIds": [
+        "REQ-70"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-update-the-scan-print-auto-print-flow-so-that-a-successful-2nd-scan-prints-via-the-connected-printer-even-when-the-internet-computer-backend-is-unavailable-stopped-ic0508-backend-submission-must-not-be-required-for-printing-success",
+      "title": "Update the Scan & Print auto-print flow so that a successful 2nd scan prints via the connected printer even when the Internet Computer backend is unavailable/stopped (IC0508). Backend submission must not be required for printing success.",
+      "reqIds": [
+        "REQ-71"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-reorder-and-harden-the-scan-print-printing-sequence-to-prevent-backend-submission-failures-from-surfacing-as-the-primary-error-when-the-printer-send-succeeds-specifically-1-validate-scans-2-generate-cpcl-3-send-cpcl-to-the-printer-4-attempt-backend-submission-only-as-a-best-effort-non-blocking-step-e-g-for-remote-history-and-if-it-fails-log-it-and-show-a-small-non-blocking-notice-instead-of-failing-the-scan-print-result",
+      "title": "Reorder and harden the Scan & Print printing sequence to prevent backend submission failures from surfacing as the primary error when the printer send succeeds. Specifically: (1) validate scans, (2) generate CPCL, (3) send CPCL to the printer, (4) attempt backend submission only as a best-effort non-blocking step (e.g., for remote history), and if it fails, log it and show a small non-blocking notice instead of failing the scan/print result.",
+      "reqIds": [
+        "REQ-72"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-replace-raw-replica-rejection-details-shown-to-the-user-during-printing-failures-with-clear-english-messages-for-ic0508-canister-stopped-errors-show-a-short-message-that-the-backend-is-unavailable-and-that-printing-can-continue-locally-if-the-printer-is-connected-do-not-display-long-reject-json-blobs-in-the-scan-print-error-banner",
+      "title": "Replace raw replica rejection details shown to the user during printing failures with clear English messages. For IC0508/canister-stopped errors, show a short message that the backend is unavailable and that printing can continue locally (if the printer is connected). Do not display long reject JSON blobs in the Scan & Print error banner.",
+      "reqIds": [
+        "REQ-73"
+      ],
+      "version": 1
     }
   ],
   "new_feature_requests": [
@@ -557,6 +654,52 @@
       "id": "AR-20",
       "summary": "Allow the user to independently select/configure each sound effect (success scan, error scan, print complete) rather than a single/shared sound setting.",
       "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-21",
+      "summary": "Use the user-provided photo as the AppShell header logo and adjust/logo sizing to achieve a perfect fit in the top-left header area next to the app title (no layout overflow).",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-22",
+      "summary": "Create a new square app logo image from the uploaded photo (image-10.png) by preserving the full photo (no cropping) and fitting it inside a square frame with padding as needed, then save it as the static asset `frontend/public/assets/generated/app-logo.dim_256x256.png` (256x256).",
+      "reqIds": [
+        "REQ-62"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-23",
+      "summary": "Fix scanner input handling in Scan & Print: ensure a single barcode scan fully populates the active serial input (no partial transfer) and prevent focus from jumping to Serial #2 mid-scan.",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-24",
+      "summary": "Remove/relax the authorization restriction that blocks printing with error \"only user can submit print job\" so valid unlocked sessions can submit print jobs without that user-only limitation.",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-25",
+      "summary": "Move sound effect configuration UI into the Label Settings tab and allow the user to use their own/custom sound files for scan success, scan error, and print complete.",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-26",
+      "summary": "Add a Clear/Reset button on the Scan & Print main screen to clear both serial number input boxes (and reset scan state).",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-28",
+      "summary": "Remove the authorization restriction that causes the print submission error \"Unauthorized: Only users can submit print jobs\" so unlocked sessions can print without requiring the backend \"user\" permission.",
+      "reqIds": [
+        "REQ-65"
+      ],
       "status": "pending"
     }
   ],

@@ -6,19 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
-import { Activity, History, FileText, Volume2, Play } from 'lucide-react';
+import { Activity, History, FileText } from 'lucide-react';
 import { useDiagnostics } from '../state/diagnosticsStore';
 import { usePrintHistory } from '../state/printHistoryStore';
 import { useLogs } from '../state/logStore';
-import { useSoundSettings, playTestSound } from '../audio/soundSystem';
 
 export default function DiagnosticsTab() {
   const diagnostics = useDiagnostics();
   const { history, reprint } = usePrintHistory();
   const { logs } = useLogs();
-  const { settings, updateSettings } = useSoundSettings();
   const [selectedLogLevel, setSelectedLogLevel] = useState<'all' | 'info' | 'warn' | 'error'>('all');
 
   const filteredLogs = selectedLogLevel === 'all' 
@@ -38,7 +35,7 @@ export default function DiagnosticsTab() {
 
   return (
     <Tabs defaultValue="stats" className="space-y-6">
-      <TabsList className="grid w-full grid-cols-4 h-14">
+      <TabsList className="grid w-full grid-cols-3 h-14">
         <TabsTrigger value="stats" className="text-base gap-2">
           <Activity className="w-4 h-4" />
           Stats
@@ -50,10 +47,6 @@ export default function DiagnosticsTab() {
         <TabsTrigger value="logs" className="text-base gap-2">
           <FileText className="w-4 h-4" />
           Logs
-        </TabsTrigger>
-        <TabsTrigger value="sounds" className="text-base gap-2">
-          <Volume2 className="w-4 h-4" />
-          Sounds
         </TabsTrigger>
       </TabsList>
 
@@ -209,154 +202,46 @@ export default function DiagnosticsTab() {
             <ScrollArea className="h-[500px]">
               <div className="space-y-2">
                 {filteredLogs.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">
-                    No logs to display
-                  </p>
+                  <p className="text-center text-muted-foreground py-8">No logs to display</p>
                 ) : (
                   filteredLogs.map((log, index) => (
                     <div
                       key={index}
-                      className="flex items-start gap-3 p-3 rounded-lg border border-border"
+                      className={`p-3 rounded-lg border ${
+                        log.level === 'error'
+                          ? 'bg-destructive/10 border-destructive'
+                          : log.level === 'warn'
+                          ? 'bg-yellow-500/10 border-yellow-500'
+                          : 'bg-muted border-border'
+                      }`}
                     >
-                      <Badge
-                        variant={
-                          log.level === 'error'
-                            ? 'destructive'
-                            : log.level === 'warn'
-                            ? 'outline'
-                            : 'default'
-                        }
-                        className="mt-0.5"
-                      >
-                        {log.level}
-                      </Badge>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-muted-foreground">
-                          {new Date(log.timestamp).toLocaleString()}
-                        </p>
-                        <p className="text-sm break-words">{log.message}</p>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge
+                              variant={
+                                log.level === 'error'
+                                  ? 'destructive'
+                                  : log.level === 'warn'
+                                  ? 'outline'
+                                  : 'secondary'
+                              }
+                              className="text-xs"
+                            >
+                              {log.level.toUpperCase()}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(log.timestamp).toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="text-sm">{log.message}</p>
+                        </div>
                       </div>
                     </div>
                   ))
                 )}
               </div>
             </ScrollArea>
-          </CardContent>
-        </Card>
-      </TabsContent>
-
-      <TabsContent value="sounds">
-        <Card>
-          <CardHeader>
-            <CardTitle>Sound Configuration</CardTitle>
-            <CardDescription>
-              Configure audio feedback for different events
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="volume">Volume</Label>
-                  <span className="text-sm text-muted-foreground">
-                    {settings.volume}%
-                  </span>
-                </div>
-                <Slider
-                  id="volume"
-                  min={0}
-                  max={100}
-                  step={5}
-                  value={[settings.volume]}
-                  onValueChange={([value]) => updateSettings({ volume: value })}
-                  className="w-full"
-                />
-              </div>
-
-              <div className="space-y-3">
-                <Label>Success Scan Sound</Label>
-                <div className="flex gap-2">
-                  <Select
-                    value={settings.successSound}
-                    onValueChange={(value: string) => updateSettings({ successSound: value })}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="beep1">Beep 1</SelectItem>
-                      <SelectItem value="beep2">Beep 2</SelectItem>
-                      <SelectItem value="chime">Chime</SelectItem>
-                      <SelectItem value="ding">Ding</SelectItem>
-                      <SelectItem value="none">None</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => playTestSound('success')}
-                  >
-                    <Play className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <Label>Error Scan Sound</Label>
-                <div className="flex gap-2">
-                  <Select
-                    value={settings.errorSound}
-                    onValueChange={(value: string) => updateSettings({ errorSound: value })}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="error1">Error 1</SelectItem>
-                      <SelectItem value="error2">Error 2</SelectItem>
-                      <SelectItem value="buzz">Buzz</SelectItem>
-                      <SelectItem value="alert">Alert</SelectItem>
-                      <SelectItem value="none">None</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => playTestSound('error')}
-                  >
-                    <Play className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <Label>Print Complete Sound</Label>
-                <div className="flex gap-2">
-                  <Select
-                    value={settings.printCompleteSound}
-                    onValueChange={(value: string) => updateSettings({ printCompleteSound: value })}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="success1">Success 1</SelectItem>
-                      <SelectItem value="success2">Success 2</SelectItem>
-                      <SelectItem value="done">Done</SelectItem>
-                      <SelectItem value="fanfare">Fanfare</SelectItem>
-                      <SelectItem value="none">None</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => playTestSound('printComplete')}
-                  >
-                    <Play className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </TabsContent>

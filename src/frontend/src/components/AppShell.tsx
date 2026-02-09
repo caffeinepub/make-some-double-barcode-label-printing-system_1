@@ -17,16 +17,18 @@ export default function AppShell() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <img 
-              src="/assets/generated/app-logo.dim_256x256.png" 
-              alt="Make Some Double logo" 
-              className="w-10 h-10 object-contain"
-            />
-            <h1 className="text-2xl font-bold text-foreground">Make Some Double!!</h1>
+        <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-shrink">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 flex items-center justify-center bg-muted/30 rounded-md p-1">
+              <img 
+                src="/assets/generated/app-logo.dim_256x256.png" 
+                alt="Make Some Double logo" 
+                className="w-full h-full object-contain"
+              />
+            </div>
+            <h1 className="text-lg sm:text-2xl font-bold text-foreground truncate">Make Some Double!!</h1>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
             <BackendAvailabilityIndicator />
             <HeaderDeviceControls />
             <Button
@@ -36,7 +38,7 @@ export default function AppShell() {
               className="gap-2"
             >
               <Lock className="w-5 h-5" />
-              Lock
+              <span className="hidden sm:inline">Lock</span>
             </Button>
           </div>
         </div>

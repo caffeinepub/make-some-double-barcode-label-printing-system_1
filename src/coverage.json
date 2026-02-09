@@ -1,23 +1,68 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-08T23:03:30.042Z",
+  "generatedAt": "2026-02-09T07:14:16.563Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 0,
-    "implemented": 0,
-    "items": []
+    "total": 3,
+    "implemented": 3,
+    "items": [
+      {
+        "id": "REQ-71",
+        "summary": "Update the Scan & Print auto-print flow so that a successful 2nd scan prints via the connected printer even when the Internet Computer backend is unavailable/stopped (IC0508). Backend submission must not be required for printing success.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/tabs/ScanPrintTab.tsx",
+          "frontend/src/utils/scanPrintErrors.ts"
+        ],
+        "matchedFiles": [
+          "frontend/src/tabs/ScanPrintTab.tsx",
+          "frontend/src/utils/scanPrintErrors.ts"
+        ]
+      },
+      {
+        "id": "REQ-72",
+        "summary": "Reorder and harden the Scan & Print printing sequence to prevent backend submission failures from surfacing as the primary error when the printer send succeeds. Specifically: (1) validate scans, (2) generate CPCL, (3) send CPCL to the printer, (4) attempt backend submission only as a best-effort non-blocking step (e.g., for remote history), and if it fails, log it and show a small non-blocking notice instead of failing the scan/print result.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/tabs/ScanPrintTab.tsx",
+          "frontend/src/state/logStore.ts"
+        ],
+        "matchedFiles": [
+          "frontend/src/tabs/ScanPrintTab.tsx",
+          "frontend/src/state/logStore.ts"
+        ]
+      },
+      {
+        "id": "REQ-73",
+        "summary": "Replace raw replica rejection details shown to the user during printing failures with clear English messages. For IC0508/canister-stopped errors, show a short message that the backend is unavailable and that printing can continue locally (if the printer is connected). Do not display long reject JSON blobs in the Scan & Print error banner.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/utils/icErrors.ts",
+          "frontend/src/tabs/ScanPrintTab.tsx",
+          "frontend/src/hooks/useQueries.ts"
+        ],
+        "matchedFiles": [
+          "frontend/src/utils/icErrors.ts",
+          "frontend/src/tabs/ScanPrintTab.tsx",
+          "frontend/src/hooks/useQueries.ts"
+        ]
+      }
+    ]
   },
   "changedFiles": [
     "build-request.json",
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/audio/soundSystem.ts",
-    "frontend/src/tabs/DiagnosticsTab.tsx",
+    "frontend/src/hooks/useQueries.ts",
+    "frontend/src/state/logStore.ts",
+    "frontend/src/tabs/ScanPrintTab.tsx",
+    "frontend/src/utils/icErrors.ts",
+    "frontend/src/utils/scanPrintErrors.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

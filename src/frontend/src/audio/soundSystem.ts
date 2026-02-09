@@ -1,15 +1,25 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+type SoundType = 'success' | 'error' | 'printComplete';
+
+interface CustomSound {
+  name: string;
+  dataUrl: string;
+}
+
 interface SoundSettings {
   successSound: string;
   errorSound: string;
   printCompleteSound: string;
   volume: number;
+  customSounds: Record<string, CustomSound>;
 }
 
 interface SoundState extends SoundSettings {
   updateSettings: (settings: Partial<SoundSettings>) => void;
+  addCustomSound: (type: SoundType, name: string, dataUrl: string) => void;
+  removeCustomSound: (type: SoundType, name: string) => void;
 }
 
 const useSoundStore = create<SoundState>()(
@@ -19,7 +29,21 @@ const useSoundStore = create<SoundState>()(
       errorSound: 'error1',
       printCompleteSound: 'success1',
       volume: 70,
+      customSounds: {},
       updateSettings: (settings) => set((state) => ({ ...state, ...settings })),
+      addCustomSound: (type, name, dataUrl) =>
+        set((state) => ({
+          customSounds: {
+            ...state.customSounds,
+            [`${type}:${name}`]: { name, dataUrl },
+          },
+        })),
+      removeCustomSound: (type, name) =>
+        set((state) => {
+          const newCustomSounds = { ...state.customSounds };
+          delete newCustomSounds[`${type}:${name}`];
+          return { customSounds: newCustomSounds };
+        }),
     }),
     {
       name: 'sound-settings',
@@ -35,8 +59,11 @@ export function useSoundSettings() {
       errorSound: settings.errorSound,
       printCompleteSound: settings.printCompleteSound,
       volume: settings.volume,
+      customSounds: settings.customSounds,
     },
     updateSettings: settings.updateSettings,
+    addCustomSound: settings.addCustomSound,
+    removeCustomSound: settings.removeCustomSound,
   };
 }
 
@@ -68,11 +95,49 @@ function playBeepSequence(sequence: Array<{ frequency: number; duration: number;
   });
 }
 
+// Play custom audio file
+async function playCustomAudio(dataUrl: string, volume: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    try {
+      const audio = new Audio(dataUrl);
+      audio.volume = volume / 100;
+      audio.onended = () => resolve();
+      audio.onerror = (e) => reject(new Error('Failed to play custom audio'));
+      audio.play().catch(reject);
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
 export function playSound(type: 'success' | 'error' | 'printComplete') {
-  const { volume, successSound, errorSound, printCompleteSound } = useSoundStore.getState();
+  const { volume, successSound, errorSound, printCompleteSound, customSounds } = useSoundStore.getState();
   
   if (volume === 0) return;
 
+  let selectedSound = '';
+  switch (type) {
+    case 'success':
+      selectedSound = successSound;
+      break;
+    case 'error':
+      selectedSound = errorSound;
+      break;
+    case 'printComplete':
+      selectedSound = printCompleteSound;
+      break;
+  }
+
+  // Check if it's a custom sound
+  const customSoundKey = `${type}:${selectedSound}`;
+  if (customSounds[customSoundKey]) {
+    playCustomAudio(customSounds[customSoundKey].dataUrl, volume).catch((error) => {
+      console.warn('Custom audio playback failed:', error);
+    });
+    return;
+  }
+
+  // Built-in sounds
   switch (type) {
     case 'success':
       switch (successSound) {
@@ -158,6 +223,57 @@ export function playSound(type: 'success' | 'error' | 'printComplete') {
   }
 }
 
-export function playTestSound(type: 'success' | 'error' | 'printComplete') {
-  playSound(type);
+export async function playTestSound(type: 'success' | 'error' | 'printComplete'): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { volume, successSound, errorSound, printCompleteSound, customSounds } = useSoundStore.getState();
+    
+    if (volume === 0) {
+      return { success: false, error: 'Volume is set to 0' };
+    }
+
+    let selectedSound = '';
+    switch (type) {
+      case 'success':
+        selectedSound = successSound;
+        break;
+      case 'error':
+        selectedSound = errorSound;
+        break;
+      case 'printComplete':
+        selectedSound = printCompleteSound;
+        break;
+    }
+
+    // Check if it's a custom sound
+    const customSoundKey = `${type}:${selectedSound}`;
+    if (customSounds[customSoundKey]) {
+      await playCustomAudio(customSounds[customSoundKey].dataUrl, volume);
+      return { success: true };
+    }
+
+    // Play built-in sound
+    playSound(type);
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Failed to play sound' };
+  }
+}
+
+export function getBuiltInSounds(type: SoundType): string[] {
+  switch (type) {
+    case 'success':
+      return ['none', 'beep1', 'beep2', 'chime', 'ding'];
+    case 'error':
+      return ['none', 'error1', 'error2', 'buzz', 'alert'];
+    case 'printComplete':
+      return ['none', 'success1', 'success2', 'done', 'fanfare'];
+  }
+}
+
+export function getCustomSounds(type: SoundType): CustomSound[] {
+  const { customSounds } = useSoundStore.getState();
+  const prefix = `${type}:`;
+  return Object.entries(customSounds)
+    .filter(([key]) => key.startsWith(prefix))
+    .map(([, sound]) => sound);
 }

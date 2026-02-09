@@ -2,9 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, RotateCcw, Info } from 'lucide-react';
 import { usePrinterService } from '../services/printerService';
 import { useLabelSettings } from '../state/labelSettingsStore';
 import { generateCPCL } from '../printing/cpclGenerator';
@@ -15,6 +16,8 @@ import { addPrintHistory } from '../state/printHistoryStore';
 import { useSubmitPrintJob } from '../hooks/useQueries';
 import SerialTypeCounters from '../components/SerialTypeCounters';
 import { getLabelTypeDisplayName } from '../utils/labelTypes';
+import { normalizeSerial } from '../utils/serialNormalization';
+import { formatBackendSubmissionError, formatPrinterError, isNonBlockingBackendError } from '../utils/scanPrintErrors';
 
 type FieldValidationState = 'idle' | 'success' | 'error';
 
@@ -30,11 +33,17 @@ export default function ScanPrintTab({ isActive }: ScanPrintTabProps) {
   const [leftValidation, setLeftValidation] = useState<FieldValidationState>('idle');
   const [rightValidation, setRightValidation] = useState<FieldValidationState>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [backendNotice, setBackendNotice] = useState('');
   const [step, setStep] = useState<1 | 2>(1);
   const [isPrinting, setIsPrinting] = useState(false);
   
   const leftInputRef = useRef<HTMLInputElement>(null);
   const rightInputRef = useRef<HTMLInputElement>(null);
+  const scanCompleteTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Track last completed value per field to prevent duplicate validation
+  const lastCompletedLeftRef = useRef<string>('');
+  const lastCompletedRightRef = useRef<string>('');
   
   const { isConnected, sendCPCL } = usePrinterService();
   const { settings } = useLabelSettings();
@@ -67,128 +76,261 @@ export default function ScanPrintTab({ isActive }: ScanPrintTabProps) {
     return null;
   };
 
-  const handleLeftSerialChange = (value: string) => {
-    setLeftSerial(value);
-    setErrorMessage('');
+  const validateAndProcessLeftSerial = (value: string) => {
+    // Normalize the serial (trim + remove scanner suffixes)
+    const normalized = normalizeSerial(value);
     
-    if (value.length >= 3) {
-      const mapping = getPrefixMapping(value);
-      if (!mapping) {
-        setLeftValidation('error');
-        setErrorMessage('Unknown prefix');
-        playSound('error');
-        addLog('error', `Unknown prefix in serial: ${value}`);
-        incrementErrors();
-      } else {
-        setDetectedType(mapping.labelType);
-        setDetectedPrefix(mapping.prefix);
-        setLeftValidation('success');
-        playSound('success');
-        addLog('info', `Detected label type: ${mapping.labelType} (${mapping.title})`);
-        incrementScans();
-        incrementTypeScans(mapping.prefix, mapping.labelType);
-        
-        // Move to step 2
-        setTimeout(() => {
-          setStep(2);
-        }, 100);
-      }
+    // Prevent duplicate validation for the same scan
+    if (normalized === lastCompletedLeftRef.current) {
+      return;
+    }
+    
+    if (normalized.length < 3) return;
+    
+    lastCompletedLeftRef.current = normalized;
+    
+    // Update displayed value if normalization changed it
+    if (normalized !== value) {
+      setLeftSerial(normalized);
+    }
+    
+    const mapping = getPrefixMapping(normalized);
+    if (!mapping) {
+      setLeftValidation('error');
+      setErrorMessage('Unknown prefix');
+      playSound('error');
+      addLog('error', `Unknown prefix in serial: ${normalized}`);
+      incrementErrors();
+    } else {
+      setDetectedType(mapping.labelType);
+      setDetectedPrefix(mapping.prefix);
+      setLeftValidation('success');
+      playSound('success');
+      addLog('info', `Detected label type: ${mapping.labelType} (${mapping.title})`);
+      incrementScans();
+      incrementTypeScans(mapping.prefix, mapping.labelType);
+      
+      // Move to step 2
+      setTimeout(() => {
+        setStep(2);
+      }, 100);
     }
   };
 
-  const handleRightSerialChange = async (value: string) => {
-    setRightSerial(value);
-    setErrorMessage('');
+  const validateAndProcessRightSerial = async (value: string) => {
+    // Ignore if printing is in progress (lock state)
+    if (isPrinting) {
+      return;
+    }
     
-    if (value.length >= 3 && detectedPrefix && detectedType) {
-      const mapping = getPrefixMapping(value);
+    // Normalize the serial (trim + remove scanner suffixes)
+    const normalized = normalizeSerial(value);
+    
+    // Prevent duplicate validation for the same scan
+    if (normalized === lastCompletedRightRef.current) {
+      return;
+    }
+    
+    if (normalized.length < 3 || !detectedPrefix || !detectedType) return;
+    
+    lastCompletedRightRef.current = normalized;
+    
+    // Update displayed value if normalization changed it
+    if (normalized !== value) {
+      setRightSerial(normalized);
+    }
+    
+    const mapping = getPrefixMapping(normalized);
+    
+    if (!mapping) {
+      setRightValidation('error');
+      setErrorMessage('Unknown prefix');
+      playSound('error');
+      addLog('error', `Unknown prefix in serial: ${normalized}`);
+      incrementErrors();
+      return;
+    }
+    
+    if (mapping.labelType !== detectedType) {
+      setRightValidation('error');
+      setErrorMessage(`Label type mismatch: expected ${getLabelTypeDisplayName(detectedType)}, got ${getLabelTypeDisplayName(mapping.labelType)}`);
+      playSound('error');
+      addLog('error', `Label type mismatch: expected ${detectedType}, got ${mapping.labelType}`);
+      incrementErrors();
+      return;
+    }
+    
+    // Check printer connection
+    if (!isConnected) {
+      setRightValidation('error');
+      setErrorMessage('Printer not connected');
+      playSound('error');
+      addLog('error', 'Print failed: printer not connected');
+      incrementErrors();
+      return;
+    }
+    
+    // Valid second scan - mark success
+    setRightValidation('success');
+    playSound('success');
+    incrementScans();
+    incrementTypeScans(detectedPrefix, detectedType);
+    
+    // Lock state - start printing (offline-first flow)
+    setIsPrinting(true);
+    setErrorMessage('');
+    setBackendNotice('');
+    
+    const normalizedLeft = normalizeSerial(leftSerial);
+    
+    try {
+      // Step 1: Generate CPCL from local settings
+      const cpcl = generateCPCL(settings!, normalizedLeft, normalized, detectedPrefix);
       
-      if (!mapping) {
-        setRightValidation('error');
-        setErrorMessage('Unknown prefix');
-        playSound('error');
-        addLog('error', `Unknown prefix in serial: ${value}`);
-        incrementErrors();
-        return;
-      }
+      // Step 2: Send CPCL to printer (critical path)
+      await sendCPCL(cpcl);
       
-      if (mapping.labelType !== detectedType) {
-        setRightValidation('error');
-        setErrorMessage(`Label type mismatch: expected ${getLabelTypeDisplayName(detectedType)}, got ${getLabelTypeDisplayName(mapping.labelType)}`);
-        playSound('error');
-        addLog('error', `Label type mismatch: expected ${detectedType}, got ${mapping.labelType}`);
-        incrementErrors();
-        return;
-      }
+      // Step 3: Update local diagnostics and history (always succeeds)
+      addPrintHistory({
+        timestamp: Date.now(),
+        prefix: detectedPrefix,
+        leftSerial: normalizedLeft,
+        rightSerial: normalized,
+        labelType: detectedType,
+        cpcl,
+        success: true,
+      });
       
-      // Check printer connection
-      if (!isConnected) {
-        setRightValidation('error');
-        setErrorMessage('Printer not connected');
-        playSound('error');
-        addLog('error', 'Print failed: printer not connected');
-        incrementErrors();
-        return;
-      }
+      incrementPrints();
+      incrementTypePrints(detectedPrefix, detectedType);
+      playSound('printComplete');
+      addLog('info', `Print completed: ${normalizedLeft} / ${normalized}`);
       
-      // Valid second scan - mark success and auto print
-      setRightValidation('success');
-      playSound('success');
-      incrementScans();
-      incrementTypeScans(detectedPrefix, detectedType);
-      
-      // Start printing
-      setIsPrinting(true);
-      
+      // Step 4: Best-effort backend submission (non-blocking)
       try {
-        // Submit to backend
         await submitPrintJob.mutateAsync({
           prefix: detectedPrefix,
-          leftSerial,
-          rightSerial: value,
+          leftSerial: normalizedLeft,
+          rightSerial: normalized,
         });
+        addLog('info', 'Backend submission successful');
+      } catch (backendError: any) {
+        // Backend failure is non-blocking if printing succeeded
+        const formattedError = formatBackendSubmissionError(backendError);
         
-        // Generate CPCL
-        const cpcl = generateCPCL(settings!, leftSerial, value, detectedPrefix);
-        
-        // Actually send CPCL to printer
-        await sendCPCL(cpcl);
-        
-        addLog('info', `Printing label: ${leftSerial} / ${value}`);
-        
-        // Save to history with success
-        addPrintHistory({
-          timestamp: Date.now(),
-          prefix: detectedPrefix,
-          leftSerial,
-          rightSerial: value,
-          labelType: detectedType,
-          cpcl,
-          success: true,
-        });
-        
-        incrementPrints();
-        incrementTypePrints(detectedPrefix, detectedType);
-        playSound('printComplete');
-        addLog('info', 'Print completed successfully');
-        
-        // Reset for next scan
-        setTimeout(() => {
-          resetForm();
-        }, 500);
-        
-      } catch (error: any) {
-        setRightValidation('error');
-        setErrorMessage(error.message || 'Print failed');
-        playSound('error');
-        addLog('error', `Print failed: ${error.message}`);
-        incrementErrors();
-        setIsPrinting(false);
+        if (isNonBlockingBackendError(backendError)) {
+          // Canister stopped - show info notice, not destructive error
+          setBackendNotice(formattedError);
+          addLog('warn', `Backend submission failed (non-blocking): ${formattedError}`);
+        } else {
+          // Other backend errors - still non-blocking but log as warning
+          setBackendNotice(formattedError);
+          addLog('warn', `Backend submission failed: ${formattedError}`);
+        }
       }
+      
+      // Reset for next scan after successful print
+      setTimeout(() => {
+        resetForm();
+      }, 500);
+      
+    } catch (printerError: any) {
+      // Printer send failed - this IS blocking
+      const formattedError = formatPrinterError(printerError);
+      setRightValidation('error');
+      setErrorMessage(formattedError);
+      playSound('error');
+      addLog('error', `Print failed: ${formattedError}`);
+      incrementErrors();
+      setIsPrinting(false);
+      // Do NOT reset form - allow user to retry
+    }
+  };
+
+  const handleLeftSerialChange = (value: string) => {
+    // Ignore changes during printing
+    if (isPrinting) return;
+    
+    setLeftSerial(value);
+    setErrorMessage('');
+    setBackendNotice('');
+    
+    // Clear any existing timer
+    if (scanCompleteTimerRef.current) {
+      clearTimeout(scanCompleteTimerRef.current);
+    }
+    
+    // Set a debounce timer to detect scan completion
+    scanCompleteTimerRef.current = setTimeout(() => {
+      validateAndProcessLeftSerial(value);
+    }, 150);
+  };
+
+  const handleLeftSerialKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Ignore during printing
+    if (isPrinting) return;
+    
+    // Detect Enter or Tab as scan completion
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      
+      if (scanCompleteTimerRef.current) {
+        clearTimeout(scanCompleteTimerRef.current);
+      }
+      
+      // Use current input value (not stale state)
+      const currentValue = e.currentTarget.value;
+      validateAndProcessLeftSerial(currentValue);
+    }
+  };
+
+  const handleRightSerialChange = (value: string) => {
+    // Ignore changes during printing
+    if (isPrinting) return;
+    
+    setRightSerial(value);
+    setErrorMessage('');
+    setBackendNotice('');
+    
+    // Clear any existing timer
+    if (scanCompleteTimerRef.current) {
+      clearTimeout(scanCompleteTimerRef.current);
+    }
+    
+    // Set a debounce timer to detect scan completion
+    scanCompleteTimerRef.current = setTimeout(() => {
+      validateAndProcessRightSerial(value);
+    }, 150);
+  };
+
+  const handleRightSerialKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // Ignore during printing
+    if (isPrinting) return;
+    
+    // Detect Enter or Tab as scan completion
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault();
+      
+      if (scanCompleteTimerRef.current) {
+        clearTimeout(scanCompleteTimerRef.current);
+      }
+      
+      // Use current input value (not stale state)
+      const currentValue = e.currentTarget.value;
+      validateAndProcessRightSerial(currentValue);
     }
   };
 
   const resetForm = () => {
+    // Clear any pending timers
+    if (scanCompleteTimerRef.current) {
+      clearTimeout(scanCompleteTimerRef.current);
+    }
+    
+    // Reset last completed tracking
+    lastCompletedLeftRef.current = '';
+    lastCompletedRightRef.current = '';
+    
     setLeftSerial('');
     setRightSerial('');
     setDetectedType(null);
@@ -196,6 +338,7 @@ export default function ScanPrintTab({ isActive }: ScanPrintTabProps) {
     setLeftValidation('idle');
     setRightValidation('idle');
     setErrorMessage('');
+    setBackendNotice('');
     setStep(1);
     setIsPrinting(false);
     leftInputRef.current?.focus();
@@ -229,15 +372,36 @@ export default function ScanPrintTab({ isActive }: ScanPrintTabProps) {
         </Alert>
       )}
 
+      {backendNotice && (
+        <Alert className="border-blue-500 bg-blue-50 dark:bg-blue-950/20">
+          <Info className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          <AlertDescription className="text-base font-medium text-blue-900 dark:text-blue-100">
+            {backendNotice}
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            Scan Serials
-            {detectedType && (
-              <Badge variant="outline" className="text-base px-3 py-1">
-                {getLabelTypeDisplayName(detectedType)}
-              </Badge>
-            )}
+            <span>Scan Serials</span>
+            <div className="flex items-center gap-3">
+              {detectedType && (
+                <Badge variant="outline" className="text-base px-3 py-1">
+                  {getLabelTypeDisplayName(detectedType)}
+                </Badge>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={resetForm}
+                disabled={isPrinting}
+                className="gap-2"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Clear
+              </Button>
+            </div>
           </CardTitle>
           <CardDescription>
             Step {step} of 2: Scan {step === 1 ? '1st' : '2nd'} Serial Number
@@ -254,6 +418,7 @@ export default function ScanPrintTab({ isActive }: ScanPrintTabProps) {
               id="left-serial"
               value={leftSerial}
               onChange={(e) => handleLeftSerialChange(e.target.value)}
+              onKeyDown={handleLeftSerialKeyDown}
               className={`h-14 text-lg font-mono ${getInputBorderClass(leftValidation)}`}
               inputMode="none"
               autoComplete="off"
@@ -270,6 +435,7 @@ export default function ScanPrintTab({ isActive }: ScanPrintTabProps) {
               id="right-serial"
               value={rightSerial}
               onChange={(e) => handleRightSerialChange(e.target.value)}
+              onKeyDown={handleRightSerialKeyDown}
               className={`h-14 text-lg font-mono ${getInputBorderClass(rightValidation)}`}
               inputMode="none"
               autoComplete="off"
