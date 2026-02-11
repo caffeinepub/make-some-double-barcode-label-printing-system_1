@@ -1,4 +1,5 @@
 import type { LabelSettings as BackendLabelSettings, LayoutSettings } from '../backend';
+import { validateBarcodeSettings } from './barcodeSettingsValidation';
 
 /**
  * Serialize label settings to a BigInt-safe JSON string for export
@@ -99,7 +100,15 @@ export function importLabelSettings(jsonString: string): BackendLabelSettings {
     }
     
     // Migrate to new format
-    return migrateOldSettings(parsed);
+    const migrated = migrateOldSettings(parsed);
+    
+    // Validate barcode settings after migration
+    const barcodeError = validateBarcodeSettings(migrated);
+    if (barcodeError) {
+      throw new Error(`Migrated settings validation failed: ${barcodeError}`);
+    }
+    
+    return migrated;
   }
   
   // Step 3: Validate new format required fields
@@ -196,8 +205,16 @@ export function importLabelSettings(jsonString: string): BackendLabelSettings {
       throw new Error(`Invalid title at index ${i} (expected string)`);
     }
   }
+
+  const settings = parsed as BackendLabelSettings;
   
-  return parsed as BackendLabelSettings;
+  // Step 5: Validate barcode settings
+  const barcodeError = validateBarcodeSettings(settings);
+  if (barcodeError) {
+    throw new Error(`Settings validation failed: ${barcodeError}`);
+  }
+  
+  return settings;
 }
 
 /**

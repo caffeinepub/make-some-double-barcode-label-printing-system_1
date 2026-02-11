@@ -206,33 +206,28 @@ export default function ScanPrintTab({ isActive }: ScanPrintTabProps) {
       playSound('printComplete');
       addLog('info', `Print completed: ${normalizedLeft} / ${normalized}`);
       
-      // Step 4: Best-effort backend submission (non-blocking)
-      try {
-        await submitPrintJob.mutateAsync({
-          prefix: detectedPrefix,
-          leftSerial: normalizedLeft,
-          rightSerial: normalized,
-        });
+      // Step 4: Immediately reset for next scan (no delay)
+      resetForm();
+      
+      // Step 5: Best-effort backend submission (fire-and-forget, non-blocking)
+      submitPrintJob.mutateAsync({
+        prefix: detectedPrefix,
+        leftSerial: normalizedLeft,
+        rightSerial: normalized,
+      }).then(() => {
         addLog('info', 'Backend submission successful');
-      } catch (backendError: any) {
-        // Backend failure is non-blocking if printing succeeded
+      }).catch((backendError: any) => {
+        // Backend failure is non-blocking - log only, don't interrupt workflow
         const formattedError = formatBackendSubmissionError(backendError);
         
         if (isNonBlockingBackendError(backendError)) {
-          // Canister stopped - show info notice, not destructive error
-          setBackendNotice(formattedError);
-          addLog('warn', `Backend submission failed (non-blocking): ${formattedError}`);
+          // Canister stopped - log as info
+          addLog('info', `Backend submission skipped (canister stopped): ${formattedError}`);
         } else {
-          // Other backend errors - still non-blocking but log as warning
-          setBackendNotice(formattedError);
-          addLog('warn', `Backend submission failed: ${formattedError}`);
+          // Other backend errors - log as warning
+          addLog('warn', `Backend submission failed (non-blocking): ${formattedError}`);
         }
-      }
-      
-      // Reset for next scan after successful print
-      setTimeout(() => {
-        resetForm();
-      }, 500);
+      });
       
     } catch (printerError: any) {
       // Printer send failed - this IS blocking

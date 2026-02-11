@@ -1,72 +1,63 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Offline-first Scan & Print: print without backend + improved backend-unavailable UX",
+  "title": "Label Settings: print test label matching the live preview",
   "requirements": [
     {
-      "id": "REQ-71",
-      "summary": "Make Scan & Print auto-print succeed locally (generate CPCL + send to printer) even when the backend is unavailable, while still recording local diagnostics and history.",
+      "id": "REQ-1",
+      "summary": "Add a \"Print test label\" action beside the Label Preview that prints exactly what the preview currently shows, with progress and error handling when no printer is connected.",
       "acceptanceCriteria": [
-        "When the backend canister is stopped/unavailable, scanning 1st serial (valid prefix) and scanning 2nd serial (matching type) still generates CPCL and sends it to the printer transport successfully.",
-        "A backend failure must not flip the 2nd serial field from success to error if the print send succeeds.",
-        "Print success must still update local diagnostics counters and local print history, including CPCL payload, even when backend calls fail."
+        "Label Settings > Label Preview area contains a \"Print test label\" action placed adjacent to the preview (e.g., in the preview card header/actions).",
+        "Clicking \"Print test label\" sends a print job to the currently connected printer using the current in-tab label settings and the exact values currently shown in the preview (sample serial 1, sample serial 2, and the title displayed in the preview).",
+        "If no printer is connected, clicking the action does not crash and instead shows a clear error toast (English) explaining that a printer must be connected (and that the user can connect it in the Devices tab).",
+        "While the test label is being sent, the UI indicates progress (e.g., disables the button and shows a \"Printing…\" label) and re-enables after completion/failure."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/tabs/ScanPrintTab.tsx",
+          "path": "frontend/src/tabs/LabelSettingsTab.tsx",
           "operation": "modify",
-          "description": "Refactor the 2nd-scan auto-print flow to be offline-first: validate scans, generate CPCL from local Label Settings, send CPCL via printerService, then always persist local print history (including CPCL) and increment local diagnostics on successful send regardless of backend availability. Move backend submission to a best-effort follow-up that cannot change the success state once printing succeeds."
-        },
-        {
-          "path": "frontend/src/utils/scanPrintErrors.ts",
-          "operation": "create",
-          "description": "Add Scan & Print–specific error/notice formatting helpers to convert printer/transport/backend errors into concise user-facing strings (no raw replica rejection blobs), including a dedicated message for IC0508/canister-stopped that states printing can continue locally when a printer is connected."
+          "description": "Add a \"Print test label\" button in the Label Preview card header/actions. Wire it to the existing printer connection state (usePrinterService) to (1) guard when no printer is connected by showing an English sonner toast directing users to the Devices tab, (2) send CPCL built from the current in-tab preview settings + current preview serial/title, and (3) show progress (disable button + label \"Printing…\") with success/failure toasts."
         }
       ]
     },
     {
-      "id": "REQ-72",
-      "summary": "Harden the printing sequence so printer-send success is authoritative; backend submission failures become non-blocking warnings without disrupting scan/print behavior.",
+      "id": "REQ-2",
+      "summary": "Refactor LabelPreview so LabelSettingsTab can read the exact preview values (sample serials and computed title) at print time without changing preview behavior.",
       "acceptanceCriteria": [
-        "If CPCL sending fails, the UI shows a print failure error state and does not reset the form.",
-        "If CPCL sending succeeds but backend submission fails, the UI still shows print complete behavior (success state, reset) and the failure is recorded only as a warning/info log (not as the main destructive error banner).",
-        "The app must remain scanner-only friendly: no modal dialogs required to dismiss before scanning the next label."
+        "LabelPreview no longer keeps the preview-critical values exclusively internal; LabelSettingsTab can read the current sample serial values and the title shown in the preview at the moment the user clicks \"Print test label\".",
+        "Changing sample serial inputs in the preview updates the values used for \"Print test label\" without requiring a page refresh.",
+        "The preview rendering behavior remains unchanged (zoom controls, layout, and sample serial inputs still work)."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/tabs/ScanPrintTab.tsx",
+          "path": "frontend/src/printing/LabelPreview.tsx",
           "operation": "modify",
-          "description": "Reorder and harden the sequence to (1) validate scans, (2) generate CPCL, (3) send CPCL, (4) trigger backend submission as non-blocking best-effort. Ensure sendCPCL failure keeps the form in-place for retry (no reset) and sets an error state; ensure backend submission failure only adds a small non-blocking notice + warn/info log and never sets destructive error state after a successful send."
+          "description": "Refactor LabelPreview to accept controlled props (sampleSerial1, sampleSerial2, and previewTitle) and change handlers (onSampleSerial1Change/onSampleSerial2Change) so the parent can always access the exact displayed values, while preserving existing zoom controls and rendering."
         },
         {
-          "path": "frontend/src/state/logStore.ts",
+          "path": "frontend/src/tabs/LabelSettingsTab.tsx",
           "operation": "modify",
-          "description": "Ensure Scan & Print can record backend-submission failures as warn/info entries (not error) with concise messages suitable for diagnostics review; keep existing persistence and caps unchanged."
+          "description": "Lift preview-critical state (sampleSerial1, sampleSerial2, and the computed preview title) into LabelSettingsTab, pass them into LabelPreview as controlled props, and ensure the preview uses the same in-tab (possibly unsaved) label settings object that will be used for printing."
         }
       ]
     },
     {
-      "id": "REQ-73",
-      "summary": "Replace raw replica rejection details with concise English messaging for backend-unavailable scenarios in Scan & Print.",
+      "id": "REQ-3",
+      "summary": "Adjust CPCL generation so the Label Settings preview test print can print with an explicit title that matches the preview title, without breaking existing print flows.",
       "acceptanceCriteria": [
-        "When an IC0508-style error occurs during any Scan & Print backend call, the user-facing error/notice text is concise and readable (no request IDs, reject code dumps, or embedded JSON).",
-        "The existing header backend availability badge may still appear, but Scan & Print must not show the full replica error blob in its main alert area."
+        "The CPCL used by \"Print test label\" uses the same layout settings as the preview and includes the same title text shown in the preview, even when prefix mappings are empty or do not match a prefix.",
+        "The implementation does not break existing print flows that use the current CPCL generator (e.g., Scan & Print, Devices tab test print)."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/utils/icErrors.ts",
+          "path": "frontend/src/printing/cpclGenerator.ts",
           "operation": "modify",
-          "description": "Update IC0508/canister-stopped messaging to be Scan & Print–appropriate (backend unavailable, printing can continue locally if printer is connected) and add/adjust helpers to reliably detect and summarize IC replica rejection errors without exposing raw rejection JSON in UI."
+          "description": "Add CPCL generation support for an explicit title (e.g., a new exported function dedicated to preview printing, or an optional parameter) that bypasses prefix-mapping title lookup when provided, while keeping the existing generateCPCL call signature/behavior for current flows intact."
         },
         {
-          "path": "frontend/src/tabs/ScanPrintTab.tsx",
+          "path": "frontend/src/tabs/LabelSettingsTab.tsx",
           "operation": "modify",
-          "description": "Replace any direct rendering of caught backend error.message with formatted, concise text from the error helper(s). Introduce a non-blocking notice area for backend submission issues so the main destructive alert is reserved for scan validation or printer-send failures only."
-        },
-        {
-          "path": "frontend/src/hooks/useQueries.ts",
-          "operation": "modify",
-          "description": "Ensure backend submission failures surfaced to callers are suitable for non-blocking handling (e.g., provide a concise error message for logging/notice) while preserving existing backend availability store updates; avoid exposing raw replica rejection blobs as the primary error string used by Scan & Print."
+          "description": "Update the new \"Print test label\" action to call the explicit-title CPCL generator so printing matches the preview title even when prefix mappings are empty or do not match."
         }
       ]
     }

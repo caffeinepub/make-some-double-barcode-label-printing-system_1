@@ -18,9 +18,7 @@ export default function DiagnosticsTab() {
   const { logs } = useLogs();
   const [selectedLogLevel, setSelectedLogLevel] = useState<'all' | 'info' | 'warn' | 'error'>('all');
 
-  const filteredLogs = selectedLogLevel === 'all' 
-    ? logs 
-    : logs.filter(log => log.level === selectedLogLevel);
+  const filteredLogs = selectedLogLevel === 'all' ? logs : logs.filter((log) => log.level === selectedLogLevel);
 
   const handleReprint = (index: number) => {
     reprint(index);
@@ -82,9 +80,7 @@ export default function DiagnosticsTab() {
           <Card>
             <CardHeader>
               <CardTitle>Counters by Serial Type</CardTitle>
-              <CardDescription>
-                Breakdown of scans and prints by prefix and label type
-              </CardDescription>
+              <CardDescription>Breakdown of scans and prints by prefix and label type</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
@@ -116,9 +112,7 @@ export default function DiagnosticsTab() {
         <Card>
           <CardHeader>
             <CardTitle>Print History</CardTitle>
-            <CardDescription>
-              Recent print jobs with reprint capability
-            </CardDescription>
+            <CardDescription>Recent print jobs with reprint capability</CardDescription>
           </CardHeader>
           <CardContent>
             <ScrollArea className="h-[500px]">
@@ -143,9 +137,7 @@ export default function DiagnosticsTab() {
                   ) : (
                     history.map((entry, index) => (
                       <TableRow key={index}>
-                        <TableCell className="text-sm">
-                          {new Date(entry.timestamp).toLocaleTimeString()}
-                        </TableCell>
+                        <TableCell className="text-sm">{new Date(entry.timestamp).toLocaleTimeString()}</TableCell>
                         <TableCell>
                           <Badge variant="outline">{entry.labelType}</Badge>
                         </TableCell>
@@ -157,11 +149,7 @@ export default function DiagnosticsTab() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleReprint(index)}
-                          >
+                          <Button variant="outline" size="sm" onClick={() => handleReprint(index)}>
                             Reprint
                           </Button>
                         </TableCell>
@@ -179,9 +167,7 @@ export default function DiagnosticsTab() {
         <Card>
           <CardHeader>
             <CardTitle>System Logs</CardTitle>
-            <CardDescription>
-              Detailed system activity and error logs
-            </CardDescription>
+            <CardDescription>Detailed system activity and barcode diagnostics</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4">
@@ -211,7 +197,7 @@ export default function DiagnosticsTab() {
                         log.level === 'error'
                           ? 'bg-destructive/10 border-destructive'
                           : log.level === 'warn'
-                          ? 'bg-yellow-500/10 border-yellow-500'
+                          ? 'bg-yellow-500/10 border-yellow-600 dark:border-yellow-500'
                           : 'bg-muted border-border'
                       }`}
                     >
@@ -220,21 +206,38 @@ export default function DiagnosticsTab() {
                           <div className="flex items-center gap-2 mb-1">
                             <Badge
                               variant={
-                                log.level === 'error'
-                                  ? 'destructive'
-                                  : log.level === 'warn'
-                                  ? 'outline'
-                                  : 'secondary'
+                                log.level === 'error' ? 'destructive' : log.level === 'warn' ? 'outline' : 'secondary'
                               }
-                              className="text-xs"
+                              className={
+                                log.level === 'warn'
+                                  ? 'bg-yellow-500/20 text-yellow-900 dark:text-yellow-100 border-yellow-600 dark:border-yellow-500'
+                                  : ''
+                              }
                             >
                               {log.level.toUpperCase()}
                             </Badge>
                             <span className="text-xs text-muted-foreground">
                               {new Date(log.timestamp).toLocaleString()}
                             </span>
+                            {log.metadata?.category && (
+                              <Badge variant="outline" className="text-xs">
+                                {log.metadata.category}
+                              </Badge>
+                            )}
                           </div>
                           <p className="text-sm">{log.message}</p>
+                          {log.metadata && Object.keys(log.metadata).length > 1 && (
+                            <div className="mt-2 text-xs text-muted-foreground font-mono">
+                              {log.metadata.barcodeIndex && <div>Barcode: {log.metadata.barcodeIndex}</div>}
+                              {log.metadata.reasonCode && <div>Reason: {log.metadata.reasonCode}</div>}
+                              {log.metadata.computedValue !== undefined && (
+                                <div>Computed: {log.metadata.computedValue}</div>
+                              )}
+                              {log.metadata.clampedValue !== undefined && (
+                                <div>Clamped: {log.metadata.clampedValue}</div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

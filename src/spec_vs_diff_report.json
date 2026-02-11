@@ -1,56 +1,50 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-09T07:14:16.558Z",
-  "summary": "Diff adds Scan & Print–specific error formatting utilities, improves IC error cleaning (including canister-stopped detection), introduces a persisted log store, and adjusts backend print-job mutation error handling. ScanPrintTab is modified (truncated) and file summaries claim an offline-first print sequence, but the truncation prevents confirming key acceptance criteria end-to-end.",
+  "generatedAt": "2026-02-11T21:38:01.804Z",
+  "summary": "Diff implements the core frontend changes for adding a Label Settings preview-driven test print: LabelPreview props were refactored to lift sample serial state to LabelSettingsTab, and LabelSettingsTab appears updated to add a new print action using a CPCL generator intended to support explicit titles. CPCL generator was also modified with additional diagnostics and a revised test-print payload, though the diff is truncated so some acceptance criteria cannot be fully verified.",
   "missing_requirements": [
     {
-      "id": "REQ-71",
-      "requirement": "When backend is stopped/unavailable, a successful 2nd scan must still print via the connected printer; backend submission must not be required for printing success; local diagnostics counters and local print history (including CPCL payload) must still update even when backend calls fail; backend failure must not flip the 2nd serial field from success to error if print send succeeds.",
-      "reason": "ScanPrintTab implementation is truncated, so it cannot be verified that (a) printing is attempted and succeeds without backend availability, (b) UI field success state is preserved when backend submission fails, and (c) local diagnostics + local print history update occurs even when backend calls fail.",
+      "id": "REQ-1",
+      "requirement": "If no printer is connected, clicking \"Print test label\" shows a clear English error toast explaining a printer must be connected (and can be connected in the Devices tab). While printing, the UI indicates progress (disable button / \"Printing…\") and re-enables on completion/failure.",
+      "reason": "LabelSettingsTab shows new printer-service usage and an isPrinting state, and the file summary claims the new button exists with progress and error handling, but the provided truncated diff does not include the actual button JSX/handler logic or the specific toast message content needed to confirm the exact behavior and wording.",
       "evidence": [
-        "frontend/src/tabs/ScanPrintTab.tsx (truncated)"
+        "frontend/src/tabs/LabelSettingsTab.tsx (truncated: shows `usePrinterService()`, `toast` import, `isPrinting` state, but not the click handler / UI)",
+        "frontend-file-summaries.txt (mentions the new button and error handling, but not verifiable from code shown)"
       ]
     },
     {
-      "id": "REQ-72",
-      "requirement": "Reorder printing sequence: validate → generate CPCL → send to printer → then attempt backend submission as best-effort non-blocking; if printer send fails show print failure and do not reset; if printer send succeeds but backend submission fails still show print-complete/reset and record only as warning/info; no modal dialogs required.",
-      "reason": "Although utilities/logging exist to support this behavior, the core ScanPrintTab logic that orchestrates sequencing and UI states is truncated, so the required ordering, reset behavior, and error-state behavior cannot be confirmed from the provided diff summary.",
+      "id": "REQ-3",
+      "requirement": "CPCL generation for \"Print test label\" must support printing with an explicit title matching the preview title (not derived from prefix mappings) and must not break existing print flows.",
+      "reason": "LabelSettingsTab imports `generateCPCLWithTitle` from cpclGenerator, but the visible portion of cpclGenerator only shows `generateCPCL` (which still derives title from prefix mappings) and `generateTestPrintCPCL`. Because cpclGenerator is truncated, the existence/behavior of `generateCPCLWithTitle` and its non-impact on existing flows cannot be confirmed from the provided diff excerpt.",
       "evidence": [
-        "frontend/src/tabs/ScanPrintTab.tsx (truncated)",
-        "frontend/src/utils/scanPrintErrors.ts",
-        "frontend/src/state/logStore.ts"
-      ]
-    },
-    {
-      "id": "REQ-73",
-      "requirement": "Replace raw replica rejection details in Scan & Print failures with clear English; for IC0508/canister-stopped, show backend unavailable message and that printing can continue locally; do not show long reject JSON blobs in Scan & Print main alert area.",
-      "reason": "Error formatting helpers were added/updated, but due to ScanPrintTab truncation it cannot be verified that Scan & Print’s displayed banner/alert no longer renders raw replica rejection blobs and instead uses the new concise messages in all backend-call failure paths.",
-      "evidence": [
-        "frontend/src/tabs/ScanPrintTab.tsx (truncated)",
-        "frontend/src/utils/icErrors.ts",
-        "frontend/src/utils/scanPrintErrors.ts",
-        "frontend/src/hooks/useQueries.ts"
+        "frontend/src/tabs/LabelSettingsTab.tsx (truncated: `import { generateCPCLWithTitle } from '../printing/cpclGenerator';`)",
+        "frontend/src/printing/cpclGenerator.ts (truncated: shows `generateCPCL()` using prefixMappings-derived title; no visible `generateCPCLWithTitle`)"
       ]
     }
   ],
   "hallucinated_features": [
     {
-      "description": "Added a persisted, capped (1000 entries) system log store with severity levels (info/warn/error).",
-      "reason": "The BuildRequest focuses on offline Scan & Print flow sequencing and error UX; it does not request implementing a new persisted logging subsystem.",
+      "description": "Added/changed CPCL generator diagnostics utilities (scale clamping, barcode height fallback, enhanced structured logging) beyond the explicit 'Print test label' requirements.",
+      "reason": "REQ-1/REQ-2/REQ-3 focus on adding a preview-adjacent test print that matches the preview and supports explicit-title CPCL. The diff includes additional robustness/logging behavior not directly requested.",
       "evidence": [
-        "frontend/src/state/logStore.ts"
+        "frontend/src/printing/cpclGenerator.ts (truncated: `clampScale`, `calculateBarcodeHeight`, multiple `addLog` diagnostic events)"
+      ]
+    },
+    {
+      "description": "Modified the generic 'test print' CPCL payload to include a CODE128 barcode and extra text lines (\"Connection OK\", \"TEST123\").",
+      "reason": "The BuildRequest did not ask to change the Devices tab test print content; it only requested a new Label Settings preview test-print option. This may be acceptable, but it is not explicitly requested.",
+      "evidence": [
+        "frontend/src/printing/cpclGenerator.ts (truncated: `generateTestPrintCPCL()` now emits `BARCODE 128 ... TEST123` and additional text)"
       ]
     }
   ],
-  "confidence": 0.56,
+  "confidence": 0.62,
   "changed_files": [
     "frontend-file-summaries.txt",
-    "frontend/src/hooks/useQueries.ts",
-    "frontend/src/state/logStore.ts",
-    "frontend/src/tabs/ScanPrintTab.tsx",
-    "frontend/src/utils/icErrors.ts",
-    "frontend/src/utils/scanPrintErrors.ts",
+    "frontend/src/printing/LabelPreview.tsx",
+    "frontend/src/printing/cpclGenerator.ts",
+    "frontend/src/tabs/LabelSettingsTab.tsx",
     "project_state.json"
   ]
 }

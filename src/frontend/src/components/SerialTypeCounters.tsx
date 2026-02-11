@@ -1,33 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Printer } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useDiagnostics } from '../state/diagnosticsStore';
 import { useLabelSettings } from '../state/labelSettingsStore';
 
 export default function SerialTypeCounters() {
   const { typeCounters } = useDiagnostics();
-  const { settings, isLoading } = useLabelSettings();
-
-  // Loading state - show skeleton cards
-  if (isLoading) {
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {[1, 2, 3].map((i) => (
-          <Card key={i} className="border-2">
-            <CardHeader className="pb-3">
-              <Skeleton className="h-5 w-32" />
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-3">
-                <Skeleton className="w-8 h-8 rounded" />
-                <Skeleton className="h-10 w-16" />
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    );
-  }
+  const { settings } = useLabelSettings();
 
   // Empty state - no prefix mappings configured
   if (!settings || settings.prefixMappings.length === 0) {

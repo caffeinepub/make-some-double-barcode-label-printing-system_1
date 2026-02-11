@@ -5,44 +5,72 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { LabelSettings as BackendLabelSettings } from '../backend';
 import { generateBarcodeSVG } from './barcodePreview';
+import { calculateCenteredBarcodeX, estimateBarcodeWidthDots } from './cpclLayoutAdjustments';
+import { getBarcodeMapping } from './cpclBarcodeMapping';
 
 interface LabelPreviewProps {
   settings: BackendLabelSettings;
+  sampleSerial1: string;
+  sampleSerial2: string;
+  previewTitle: string;
+  onSampleSerial1Change: (value: string) => void;
+  onSampleSerial2Change: (value: string) => void;
 }
 
-export default function LabelPreview({ settings }: LabelPreviewProps) {
+export default function LabelPreview({ 
+  settings, 
+  sampleSerial1, 
+  sampleSerial2, 
+  previewTitle,
+  onSampleSerial1Change,
+  onSampleSerial2Change
+}: LabelPreviewProps) {
   const [zoom, setZoom] = useState(100);
-  
-  // Sample serial inputs for preview
-  const [sampleSerial1, setSampleSerial1] = useState('SSVSBM2H7M5JB1');
-  const [sampleSerial2, setSampleSerial2] = useState('SSVSBM2H7M5JB2');
 
   // Scale factor for 1:1 display (1mm = 3.78px at 96 DPI)
   const MM_TO_PX = 3.78;
+  // DPI for barcode width estimation (matches CPCL generator)
+  const DPI = 203;
+  const DOTS_TO_PX = (25.4 / DPI) * MM_TO_PX; // Convert dots to preview pixels
   
   const widthMm = Number(settings.widthMm);
   const heightMm = Number(settings.heightMm);
   const widthPx = widthMm * MM_TO_PX;
   const heightPx = heightMm * MM_TO_PX;
+  const widthDots = Math.round((widthMm / 25.4) * DPI);
 
-  // Get sample data from first prefix mapping
-  const sampleTitle = settings.prefixMappings[0]?.[1]?.title || 'Dual Band';
+  // Get barcode parameters for width estimation
+  const barcodeMapping = getBarcodeMapping(settings.barcodeType);
+  const barcodeWidth = barcodeMapping.recommendedWidth;
+  const barcodeRatio = barcodeMapping.recommendedRatio;
 
-  // Helper to convert layout settings to pixels
-  const layoutToPx = (layout: any) => ({
-    x: Number(layout.x) * MM_TO_PX,
-    y: Number(layout.y) * MM_TO_PX,
-    width: Number(layout.width) * MM_TO_PX,
-    height: Number(layout.height) * MM_TO_PX,
-    fontSize: Number(layout.fontSize) * layout.scale,
-    scale: layout.scale,
-  });
+  // Helper to convert layout settings to pixels with centering adjustment
+  const layoutToPx = (layout: any, serial: string, barcodeIndex: 1 | 2) => {
+    const basePx = {
+      x: Number(layout.x) * MM_TO_PX,
+      y: Number(layout.y) * MM_TO_PX,
+      width: Number(layout.width) * MM_TO_PX,
+      height: Number(layout.height) * MM_TO_PX,
+      fontSize: Number(layout.fontSize) * layout.scale,
+      scale: layout.scale,
+    };
 
-  const titlePx = layoutToPx(settings.titleLayout);
-  const barcode1Px = layoutToPx(settings.barcode1Layout);
-  const serial1Px = layoutToPx(settings.serialText1Layout);
-  const barcode2Px = layoutToPx(settings.barcode2Layout);
-  const serial2Px = layoutToPx(settings.serialText2Layout);
+    // Apply centering adjustment for barcodes (matching CPCL generator)
+    if (barcodeIndex) {
+      const estimatedWidthDots = estimateBarcodeWidthDots(serial.length, barcodeWidth, barcodeRatio);
+      const requestedXDots = Math.round(Number(layout.x) / 25.4 * DPI);
+      const adjustment = calculateCenteredBarcodeX(estimatedWidthDots, widthDots, requestedXDots, barcodeIndex);
+      basePx.x = adjustment.adjustedX * DOTS_TO_PX;
+    }
+
+    return basePx;
+  };
+
+  const titlePx = layoutToPx(settings.titleLayout, '', 0 as any);
+  const barcode1Px = layoutToPx(settings.barcode1Layout, sampleSerial1, 1);
+  const serial1Px = layoutToPx(settings.serialText1Layout, '', 0 as any);
+  const barcode2Px = layoutToPx(settings.barcode2Layout, sampleSerial2, 2);
+  const serial2Px = layoutToPx(settings.serialText2Layout, '', 0 as any);
 
   // Generate barcode SVGs
   const barcode1SVG = generateBarcodeSVG(
@@ -84,7 +112,7 @@ export default function LabelPreview({ settings }: LabelPreviewProps) {
           <Input
             id="sample-serial-1"
             value={sampleSerial1}
-            onChange={(e) => setSampleSerial1(e.target.value)}
+            onChange={(e) => onSampleSerial1Change(e.target.value)}
             className="font-mono"
           />
         </div>
@@ -95,7 +123,7 @@ export default function LabelPreview({ settings }: LabelPreviewProps) {
           <Input
             id="sample-serial-2"
             value={sampleSerial2}
-            onChange={(e) => setSampleSerial2(e.target.value)}
+            onChange={(e) => onSampleSerial2Change(e.target.value)}
             className="font-mono"
           />
         </div>
@@ -166,7 +194,7 @@ export default function LabelPreview({ settings }: LabelPreviewProps) {
                 alignItems: 'center',
               }}
             >
-              {sampleTitle}
+              {previewTitle}
             </div>
 
             {/* Barcode 1 */}
@@ -231,6 +259,7 @@ export default function LabelPreview({ settings }: LabelPreviewProps) {
       {/* Help Text */}
       <div className="text-xs text-muted-foreground space-y-1">
         <p>• Preview shows exactly how the label will print (1:1 scale at 100%)</p>
+        <p>• Barcodes are automatically centered to prevent clipping</p>
         <p>• Edit sample serials above to see different barcodes</p>
         <p>• Adjust settings below to customize layout</p>
       </div>

@@ -2,11 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-update-the-scan-print-auto-print-flow-so-that-a-successful-2nd-scan-prints-via-the-connected-printer-even-when-the-internet-computer-backend-is-unavailable-stopped-ic0508-backend-submission-must-not-be-required-for-printing-success",
-      "featureTitle": "Update the Scan & Print auto-print flow so that a successful 2nd scan prints via the connected printer even when the Internet Computer backend is unavailable/stopped (IC0508). Backend submission must not be required for printing success.",
+      "featureId": "feature-in-the-label-settings-tab-add-a-user-visible-action-next-to-the-label-preview-that-prints-a-test-label-matching-the-current-preview-including-the-current-sample-serial-inputs-and-the-preview-title-use-english-for-the-button-label-and-any-related-ui-text-e-g-print-test-label",
+      "featureTitle": "In the Label Settings tab, add a user-visible action next to the Label Preview that prints a test label matching the current preview (including the current sample serial inputs and the preview title). Use English for the button label and any related UI text (e.g., \"Print test label\").",
       "files": [
-        "frontend/src/tabs/ScanPrintTab.tsx",
-        "frontend/src/utils/scanPrintErrors.ts"
+        "frontend/src/tabs/LabelSettingsTab.tsx"
       ],
       "components": [
         "authorization@4.0.0",
@@ -17,16 +16,16 @@
         "github-export-icp-cli@1.0.0"
       ],
       "testIds": [
-        "REQ-71"
+        "REQ-1"
       ],
       "confidence": "high"
     },
     {
-      "featureId": "feature-reorder-and-harden-the-scan-print-printing-sequence-to-prevent-backend-submission-failures-from-surfacing-as-the-primary-error-when-the-printer-send-succeeds-specifically-1-validate-scans-2-generate-cpcl-3-send-cpcl-to-the-printer-4-attempt-backend-submission-only-as-a-best-effort-non-blocking-step-e-g-for-remote-history-and-if-it-fails-log-it-and-show-a-small-non-blocking-notice-instead-of-failing-the-scan-print-result",
-      "featureTitle": "Reorder and harden the Scan & Print printing sequence to prevent backend submission failures from surfacing as the primary error when the printer send succeeds. Specifically: (1) validate scans, (2) generate CPCL, (3) send CPCL to the printer, (4) attempt backend submission only as a best-effort non-blocking step (e.g., for remote history), and if it fails, log it and show a small non-blocking notice instead of failing the scan/print result.",
+      "featureId": "feature-refactor-the-label-preview-component-so-the-parent-labelsettingstab-can-access-the-exact-preview-data-currently-being-displayed-at-minimum-sample-serial-1-sample-serial-2-and-the-computed-preview-title-so-the-new-print-test-label-action-can-print-exactly-what-is-shown",
+      "featureTitle": "Refactor the Label Preview component so the parent (LabelSettingsTab) can access the exact preview data currently being displayed (at minimum: sample serial 1, sample serial 2, and the computed preview title), so the new \"Print test label\" action can print exactly what is shown.",
       "files": [
-        "frontend/src/state/logStore.ts",
-        "frontend/src/tabs/ScanPrintTab.tsx"
+        "frontend/src/printing/LabelPreview.tsx",
+        "frontend/src/tabs/LabelSettingsTab.tsx"
       ],
       "components": [
         "authorization@4.0.0",
@@ -37,17 +36,16 @@
         "github-export-icp-cli@1.0.0"
       ],
       "testIds": [
-        "REQ-72"
+        "REQ-2"
       ],
       "confidence": "high"
     },
     {
-      "featureId": "feature-replace-raw-replica-rejection-details-shown-to-the-user-during-printing-failures-with-clear-english-messages-for-ic0508-canister-stopped-errors-show-a-short-message-that-the-backend-is-unavailable-and-that-printing-can-continue-locally-if-the-printer-is-connected-do-not-display-long-reject-json-blobs-in-the-scan-print-error-banner",
-      "featureTitle": "Replace raw replica rejection details shown to the user during printing failures with clear English messages. For IC0508/canister-stopped errors, show a short message that the backend is unavailable and that printing can continue locally (if the printer is connected). Do not display long reject JSON blobs in the Scan & Print error banner.",
+      "featureId": "feature-add-adjust-cpcl-generation-support-so-printing-from-the-label-settings-preview-does-not-depend-on-prefix-mappings-to-determine-the-printed-title-it-must-be-able-to-print-with-an-explicit-title-matching-the-preview-title",
+      "featureTitle": "Add/adjust CPCL generation support so printing from the Label Settings preview does not depend on prefix mappings to determine the printed title; it must be able to print with an explicit title matching the preview title.",
       "files": [
-        "frontend/src/hooks/useQueries.ts",
-        "frontend/src/tabs/ScanPrintTab.tsx",
-        "frontend/src/utils/icErrors.ts"
+        "frontend/src/printing/cpclGenerator.ts",
+        "frontend/src/tabs/LabelSettingsTab.tsx"
       ],
       "components": [
         "authorization@4.0.0",
@@ -58,7 +56,7 @@
         "github-export-icp-cli@1.0.0"
       ],
       "testIds": [
-        "REQ-73"
+        "REQ-3"
       ],
       "confidence": "high"
     }
