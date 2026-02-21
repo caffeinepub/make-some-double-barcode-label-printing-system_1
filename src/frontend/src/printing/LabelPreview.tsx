@@ -4,12 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { LabelSettings as BackendLabelSettings } from '../backend';
+import type { ExtendedLabelSettings } from '../state/labelSettingsStore';
 import { generateBarcodeSVG } from './barcodePreview';
-import { calculateCenteredBarcodeX, estimateBarcodeWidthDots } from './cpclLayoutAdjustments';
+import { calculateLeftAlignedBarcodeX, estimateBarcodeWidthDots } from './cpclLayoutAdjustments';
 import { getBarcodeMapping } from './cpclBarcodeMapping';
+import { mmToPx, mmToDots, dotsToPx } from './previewUnits';
 
 interface LabelPreviewProps {
-  settings: BackendLabelSettings;
+  settings: BackendLabelSettings | ExtendedLabelSettings;
   sampleSerial1: string;
   sampleSerial2: string;
   previewTitle: string;
@@ -26,64 +28,73 @@ export default function LabelPreview({
   onSampleSerial2Change
 }: LabelPreviewProps) {
   const [zoom, setZoom] = useState(100);
-
-  // Scale factor for 1:1 display (1mm = 3.78px at 96 DPI)
-  const MM_TO_PX = 3.78;
-  // DPI for barcode width estimation (matches CPCL generator)
-  const DPI = 203;
-  const DOTS_TO_PX = (25.4 / DPI) * MM_TO_PX; // Convert dots to preview pixels
   
   const widthMm = Number(settings.widthMm);
   const heightMm = Number(settings.heightMm);
-  const widthPx = widthMm * MM_TO_PX;
-  const heightPx = heightMm * MM_TO_PX;
-  const widthDots = Math.round((widthMm / 25.4) * DPI);
+  
+  // Get calibration offsets (default to 0 if not present)
+  const extendedSettings = settings as ExtendedLabelSettings;
+  const offsetXmm = extendedSettings.calibrationOffsetXmm ?? 0;
+  const offsetYmm = extendedSettings.calibrationOffsetYmm ?? 0;
+  
+  // Use authoritative mm-to-px conversion for true 48x30mm sizing
+  const widthPx = mmToPx(widthMm);
+  const heightPx = mmToPx(heightMm);
+  const widthDots = mmToDots(widthMm);
 
   // Get barcode parameters for width estimation
   const barcodeMapping = getBarcodeMapping(settings.barcodeType);
   const barcodeWidth = barcodeMapping.recommendedWidth;
   const barcodeRatio = barcodeMapping.recommendedRatio;
 
-  // Helper to convert layout settings to pixels with centering adjustment
-  const layoutToPx = (layout: any, serial: string, barcodeIndex: 1 | 2) => {
+  // Helper to convert layout settings to pixels with clamp adjustment and calibration offset
+  const layoutToPx = (layout: any, serial: string, barcodeIndex: 1 | 2 | null) => {
+    // Apply calibration offset to base position (in mm)
+    const xMm = Number(layout.x) + offsetXmm;
+    const yMm = Number(layout.y) + offsetYmm;
+    
     const basePx = {
-      x: Number(layout.x) * MM_TO_PX,
-      y: Number(layout.y) * MM_TO_PX,
-      width: Number(layout.width) * MM_TO_PX,
-      height: Number(layout.height) * MM_TO_PX,
+      x: mmToPx(xMm),
+      y: mmToPx(yMm),
+      width: mmToPx(Number(layout.width)),
+      height: mmToPx(Number(layout.height)),
       fontSize: Number(layout.fontSize) * layout.scale,
       scale: layout.scale,
     };
 
-    // Apply centering adjustment for barcodes (matching CPCL generator)
+    // Apply clamp adjustment for barcodes (matching CPCL generator)
     if (barcodeIndex) {
       const estimatedWidthDots = estimateBarcodeWidthDots(serial.length, barcodeWidth, barcodeRatio);
-      const requestedXDots = Math.round(Number(layout.x) / 25.4 * DPI);
-      const adjustment = calculateCenteredBarcodeX(estimatedWidthDots, widthDots, requestedXDots, barcodeIndex);
-      basePx.x = adjustment.adjustedX * DOTS_TO_PX;
+      const requestedXDots = mmToDots(xMm); // Left edge position in dots
+      const adjustment = calculateLeftAlignedBarcodeX(estimatedWidthDots, widthDots, requestedXDots, barcodeIndex);
+      // Convert adjusted dots back to preview pixels
+      basePx.x = dotsToPx(adjustment.adjustedX);
     }
 
     return basePx;
   };
 
-  const titlePx = layoutToPx(settings.titleLayout, '', 0 as any);
+  const titlePx = layoutToPx(settings.titleLayout, '', null);
   const barcode1Px = layoutToPx(settings.barcode1Layout, sampleSerial1, 1);
-  const serial1Px = layoutToPx(settings.serialText1Layout, '', 0 as any);
+  const serial1Px = layoutToPx(settings.serialText1Layout, '', null);
   const barcode2Px = layoutToPx(settings.barcode2Layout, sampleSerial2, 2);
-  const serial2Px = layoutToPx(settings.serialText2Layout, '', 0 as any);
+  const serial2Px = layoutToPx(settings.serialText2Layout, '', null);
 
-  // Generate barcode SVGs
+  // Generate barcode SVGs with estimated width for accurate preview
+  const barcode1WidthDots = estimateBarcodeWidthDots(sampleSerial1.length, barcodeWidth, barcodeRatio);
+  const barcode2WidthDots = estimateBarcodeWidthDots(sampleSerial2.length, barcodeWidth, barcodeRatio);
+  
   const barcode1SVG = generateBarcodeSVG(
     sampleSerial1,
     settings.barcodeType,
-    barcode1Px.width,
+    dotsToPx(barcode1WidthDots),
     barcode1Px.height
   );
   
   const barcode2SVG = generateBarcodeSVG(
     sampleSerial2,
     settings.barcodeType,
-    barcode2Px.width,
+    dotsToPx(barcode2WidthDots),
     barcode2Px.height
   );
 
@@ -173,7 +184,7 @@ export default function LabelPreview({
             transformOrigin: 'center center',
           }}
         >
-          {/* Label Canvas */}
+          {/* Label Canvas - true 48x30mm size at 100% zoom */}
           <div
             className="bg-white border-2 border-gray-400 relative shadow-lg"
             style={{
@@ -203,7 +214,7 @@ export default function LabelPreview({
               style={{
                 left: `${barcode1Px.x}px`,
                 top: `${barcode1Px.y}px`,
-                width: `${barcode1Px.width}px`,
+                width: `${dotsToPx(barcode1WidthDots)}px`,
                 height: `${barcode1Px.height}px`,
               }}
               dangerouslySetInnerHTML={{ __html: barcode1SVG }}
@@ -231,7 +242,7 @@ export default function LabelPreview({
               style={{
                 left: `${barcode2Px.x}px`,
                 top: `${barcode2Px.y}px`,
-                width: `${barcode2Px.width}px`,
+                width: `${dotsToPx(barcode2WidthDots)}px`,
                 height: `${barcode2Px.height}px`,
               }}
               dangerouslySetInnerHTML={{ __html: barcode2SVG }}
@@ -258,8 +269,8 @@ export default function LabelPreview({
 
       {/* Help Text */}
       <div className="text-xs text-muted-foreground space-y-1">
-        <p>• Preview shows exactly how the label will print (1:1 scale at 100%)</p>
-        <p>• Barcodes are automatically centered to prevent clipping</p>
+        <p>• Preview shows exactly how the label will print (true 48×30mm at 100% zoom)</p>
+        <p>• Barcodes are positioned with minimal margins to prevent clipping</p>
         <p>• Edit sample serials above to see different barcodes</p>
         <p>• Adjust settings below to customize layout</p>
       </div>

@@ -1,10 +1,11 @@
 import type { LabelSettings as BackendLabelSettings, LayoutSettings } from '../backend';
+import type { ExtendedLabelSettings } from '../state/labelSettingsStore';
 import { validateBarcodeSettings } from './barcodeSettingsValidation';
 
 /**
  * Serialize label settings to a BigInt-safe JSON string for export
  */
-export function exportLabelSettings(settings: BackendLabelSettings): string {
+export function exportLabelSettings(settings: BackendLabelSettings | ExtendedLabelSettings): string {
   return JSON.stringify(settings, (key, val) => {
     // Convert BigInt to string with 'n' suffix
     if (typeof val === 'bigint') {
@@ -31,10 +32,14 @@ function createDefaultLayout(x: number, y: number, width: number, height: number
 /**
  * Migrate old settings structure to new layout-based structure
  */
-function migrateOldSettings(parsed: any): BackendLabelSettings {
-  // If already has new structure, return as-is
+function migrateOldSettings(parsed: any): ExtendedLabelSettings {
+  // If already has new structure, return as-is with calibration offsets
   if (parsed.titleLayout && parsed.barcode1Layout) {
-    return parsed as BackendLabelSettings;
+    return {
+      ...parsed,
+      calibrationOffsetXmm: parsed.calibrationOffsetXmm ?? 0,
+      calibrationOffsetYmm: parsed.calibrationOffsetYmm ?? 0,
+    } as ExtendedLabelSettings;
   }
 
   // Migrate from old structure
@@ -64,6 +69,8 @@ function migrateOldSettings(parsed: any): BackendLabelSettings {
     serialText1Layout: createDefaultLayout(2, serial1Y, widthMm - 4, 3, 8),
     barcode2Layout: createDefaultLayout(2, barcode2Y, widthMm - 4, barcodeHeight, 10),
     serialText2Layout: createDefaultLayout(2, serial2Y, widthMm - 4, 3, 8),
+    calibrationOffsetXmm: 0,
+    calibrationOffsetYmm: 0,
   };
 }
 
@@ -71,7 +78,7 @@ function migrateOldSettings(parsed: any): BackendLabelSettings {
  * Parse and validate imported JSON into LabelSettings
  * Returns the parsed settings or throws an error with a descriptive message
  */
-export function importLabelSettings(jsonString: string): BackendLabelSettings {
+export function importLabelSettings(jsonString: string): ExtendedLabelSettings {
   let parsed: any;
   
   // Step 1: Parse JSON
@@ -206,9 +213,14 @@ export function importLabelSettings(jsonString: string): BackendLabelSettings {
     }
   }
 
-  const settings = parsed as BackendLabelSettings;
+  // Step 5: Ensure calibration offsets exist (default to 0 if missing)
+  const settings: ExtendedLabelSettings = {
+    ...parsed,
+    calibrationOffsetXmm: typeof parsed.calibrationOffsetXmm === 'number' ? parsed.calibrationOffsetXmm : 0,
+    calibrationOffsetYmm: typeof parsed.calibrationOffsetYmm === 'number' ? parsed.calibrationOffsetYmm : 0,
+  };
   
-  // Step 5: Validate barcode settings
+  // Step 6: Validate barcode settings
   const barcodeError = validateBarcodeSettings(settings);
   if (barcodeError) {
     throw new Error(`Settings validation failed: ${barcodeError}`);
@@ -248,7 +260,7 @@ export function validatePrefixMappings(
 /**
  * Download settings as a JSON file
  */
-export function downloadSettingsFile(settings: BackendLabelSettings, filename: string = 'label-settings.json') {
+export function downloadSettingsFile(settings: BackendLabelSettings | ExtendedLabelSettings, filename: string = 'label-settings.json') {
   const jsonString = exportLabelSettings(settings);
   const blob = new Blob([jsonString], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -266,7 +278,7 @@ export function downloadSettingsFile(settings: BackendLabelSettings, filename: s
 /**
  * Read and parse a settings file from user input
  */
-export async function readSettingsFile(file: File): Promise<BackendLabelSettings> {
+export async function readSettingsFile(file: File): Promise<ExtendedLabelSettings> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     

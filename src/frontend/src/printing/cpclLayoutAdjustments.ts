@@ -1,7 +1,9 @@
 /**
- * Shared CPCL layout adjustment utilities for centering and clamping barcodes
+ * Shared CPCL layout adjustment utilities for clamping barcodes
  * to prevent left/right clipping on the label.
  */
+
+import { addLog } from '../state/logStore';
 
 export interface BarcodeAdjustment {
   originalX: number;
@@ -11,61 +13,98 @@ export interface BarcodeAdjustment {
 }
 
 /**
- * Calculate the effective barcode X position, centered within label width
- * and clamped to prevent left/right clipping.
+ * Clamp barcode X position to prevent left/right clipping.
+ * The requestedX is the left edge position of the barcode in dots.
  * 
  * @param barcodeWidthDots - Estimated barcode width in dots
  * @param labelWidthDots - Label width in dots
- * @param requestedX - Original X position from settings (dots)
+ * @param requestedX - Left edge X position from settings (dots)
  * @param barcodeIndex - Barcode index (1 or 2) for logging
  * @returns Adjustment metadata with original and adjusted X positions
  */
-export function calculateCenteredBarcodeX(
+export function calculateLeftAlignedBarcodeX(
   barcodeWidthDots: number,
   labelWidthDots: number,
   requestedX: number,
   barcodeIndex: 1 | 2
 ): BarcodeAdjustment {
-  // Center the barcode horizontally
-  const centeredX = Math.round((labelWidthDots - barcodeWidthDots) / 2);
+  // Define minimum margins (in dots) to prevent edge clipping
+  const minMargin = 5; // ~0.6mm at 203 DPI - reduced for tighter fit
   
-  // Clamp to prevent left/right clipping
-  const minX = 0;
-  const maxX = Math.max(0, labelWidthDots - barcodeWidthDots);
-  const clampedX = Math.max(minX, Math.min(maxX, centeredX));
+  // Clamp to ensure barcode stays within safe printable area
+  const minX = minMargin;
+  const maxX = Math.max(minMargin, labelWidthDots - barcodeWidthDots - minMargin);
+  const clampedX = Math.max(minX, Math.min(maxX, requestedX));
   
-  const wasClamped = clampedX !== centeredX;
+  const wasClamped = Math.abs(clampedX - requestedX) > 0.5;
+  
+  if (wasClamped) {
+    addLog(
+      'warn',
+      `Barcode ${barcodeIndex} X clamped to prevent clipping: ${Math.round(requestedX)} → ${Math.round(clampedX)} dots`,
+      {
+        category: 'barcode',
+        barcodeIndex,
+        reasonCode: 'POSITION_CLAMPED',
+        requestedX,
+        clampedX,
+        estimatedWidth: barcodeWidthDots,
+        labelWidth: labelWidthDots,
+        minMargin,
+      }
+    );
+  }
   
   return {
     originalX: requestedX,
-    adjustedX: clampedX,
+    adjustedX: Math.round(clampedX),
     barcodeIndex,
     wasClamped,
   };
 }
 
 /**
- * Estimate barcode width in dots based on data length and barcode parameters.
- * This is a rough estimate for layout purposes.
+ * Estimate barcode width in dots based on data length and CPCL parameters.
+ * This is a conservative estimate used for clipping prevention.
+ * 
+ * For CODE128 with width=2, ratio=1:
+ * - Each character: ~11 modules
+ * - Start/Stop: 6 modules each
+ * - Check digit: 11 modules
+ * - Quiet zones: 10 modules each side
+ * - Module width: 2 dots (narrow bar)
  * 
  * @param dataLength - Length of barcode data string
- * @param narrowBarWidth - CPCL width parameter (narrow bar width in dots)
- * @param ratio - CPCL ratio parameter (wide:narrow ratio encoded as 0=2:1, 1=2.5:1, etc.)
+ * @param width - CPCL width parameter (narrow bar width in dots)
+ * @param ratio - CPCL ratio parameter (wide:narrow bar ratio, encoded as integer)
  * @returns Estimated barcode width in dots
  */
 export function estimateBarcodeWidthDots(
   dataLength: number,
-  narrowBarWidth: number,
+  width: number,
   ratio: number
 ): number {
-  // CODE128 typically uses ~11 modules per character + start/stop/checksum overhead
-  // Each module is narrowBarWidth dots
-  // Ratio affects wide bars (but CODE128 is mostly narrow bars)
-  const modulesPerChar = 11;
-  const overheadModules = 35; // start + stop + checksum + quiet zones
-  const totalModules = (dataLength * modulesPerChar) + overheadModules;
+  // CODE128 structure:
+  // - Start character: 11 modules
+  // - Data characters: 11 modules each
+  // - Check digit: 11 modules
+  // - Stop character: 13 modules (11 + 2 for termination bar)
+  // - Quiet zones: 10 modules on each side
   
-  // Conservative estimate: assume average module width
-  const avgModuleWidth = narrowBarWidth * (1 + ratio * 0.1);
-  return Math.round(totalModules * avgModuleWidth);
+  const startModules = 11;
+  const dataModules = dataLength * 11;
+  const checkModules = 11;
+  const stopModules = 13;
+  const quietZoneModules = 20; // 10 on each side
+  
+  const totalModules = startModules + dataModules + checkModules + stopModules + quietZoneModules;
+  
+  // Each module is `width` dots (narrow bar width)
+  // CPCL ratio parameter: 0=2:1, 1=2.5:1, 2=3:1
+  // For ratio=1 (2.5:1), wide bars are 2.5x narrow bars
+  // Average module width considering mix of narrow and wide bars
+  const ratioMultiplier = 2.0 + (ratio * 0.5); // 0→2.0, 1→2.5, 2→3.0
+  const avgModuleWidth = width * (1 + ratioMultiplier) / 2;
+  
+  return Math.ceil(totalModules * avgModuleWidth);
 }

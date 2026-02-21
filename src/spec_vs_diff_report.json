@@ -1,50 +1,15 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-11T21:38:01.804Z",
-  "summary": "Diff implements the core frontend changes for adding a Label Settings preview-driven test print: LabelPreview props were refactored to lift sample serial state to LabelSettingsTab, and LabelSettingsTab appears updated to add a new print action using a CPCL generator intended to support explicit titles. CPCL generator was also modified with additional diagnostics and a revised test-print payload, though the diff is truncated so some acceptance criteria cannot be fully verified.",
-  "missing_requirements": [
-    {
-      "id": "REQ-1",
-      "requirement": "If no printer is connected, clicking \"Print test label\" shows a clear English error toast explaining a printer must be connected (and can be connected in the Devices tab). While printing, the UI indicates progress (disable button / \"Printing…\") and re-enables on completion/failure.",
-      "reason": "LabelSettingsTab shows new printer-service usage and an isPrinting state, and the file summary claims the new button exists with progress and error handling, but the provided truncated diff does not include the actual button JSX/handler logic or the specific toast message content needed to confirm the exact behavior and wording.",
-      "evidence": [
-        "frontend/src/tabs/LabelSettingsTab.tsx (truncated: shows `usePrinterService()`, `toast` import, `isPrinting` state, but not the click handler / UI)",
-        "frontend-file-summaries.txt (mentions the new button and error handling, but not verifiable from code shown)"
-      ]
-    },
-    {
-      "id": "REQ-3",
-      "requirement": "CPCL generation for \"Print test label\" must support printing with an explicit title matching the preview title (not derived from prefix mappings) and must not break existing print flows.",
-      "reason": "LabelSettingsTab imports `generateCPCLWithTitle` from cpclGenerator, but the visible portion of cpclGenerator only shows `generateCPCL` (which still derives title from prefix mappings) and `generateTestPrintCPCL`. Because cpclGenerator is truncated, the existence/behavior of `generateCPCLWithTitle` and its non-impact on existing flows cannot be confirmed from the provided diff excerpt.",
-      "evidence": [
-        "frontend/src/tabs/LabelSettingsTab.tsx (truncated: `import { generateCPCLWithTitle } from '../printing/cpclGenerator';`)",
-        "frontend/src/printing/cpclGenerator.ts (truncated: shows `generateCPCL()` using prefixMappings-derived title; no visible `generateCPCLWithTitle`)"
-      ]
-    }
-  ],
-  "hallucinated_features": [
-    {
-      "description": "Added/changed CPCL generator diagnostics utilities (scale clamping, barcode height fallback, enhanced structured logging) beyond the explicit 'Print test label' requirements.",
-      "reason": "REQ-1/REQ-2/REQ-3 focus on adding a preview-adjacent test print that matches the preview and supports explicit-title CPCL. The diff includes additional robustness/logging behavior not directly requested.",
-      "evidence": [
-        "frontend/src/printing/cpclGenerator.ts (truncated: `clampScale`, `calculateBarcodeHeight`, multiple `addLog` diagnostic events)"
-      ]
-    },
-    {
-      "description": "Modified the generic 'test print' CPCL payload to include a CODE128 barcode and extra text lines (\"Connection OK\", \"TEST123\").",
-      "reason": "The BuildRequest did not ask to change the Devices tab test print content; it only requested a new Label Settings preview test-print option. This may be acceptable, but it is not explicitly requested.",
-      "evidence": [
-        "frontend/src/printing/cpclGenerator.ts (truncated: `generateTestPrintCPCL()` now emits `BARCODE 128 ... TEST123` and additional text)"
-      ]
-    }
-  ],
-  "confidence": 0.62,
+  "generatedAt": "2026-02-21T09:18:48.956Z",
+  "summary": "The diff implements all four requirements. REQ-1/2/3 are addressed through cpclLayoutAdjustments.ts which provides barcode width estimation and position clamping logic. REQ-4 is addressed through LabelPreview.tsx which integrates the same calculation logic to match CPCL output. No missing requirements or hallucinated features detected.",
+  "missing_requirements": [],
+  "hallucinated_features": [],
+  "confidence": 0.95,
   "changed_files": [
     "frontend-file-summaries.txt",
     "frontend/src/printing/LabelPreview.tsx",
-    "frontend/src/printing/cpclGenerator.ts",
-    "frontend/src/tabs/LabelSettingsTab.tsx",
+    "frontend/src/printing/cpclLayoutAdjustments.ts",
     "project_state.json"
   ]
 }

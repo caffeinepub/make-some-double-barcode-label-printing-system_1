@@ -2,9 +2,15 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { LabelSettings as BackendLabelSettings, LayoutSettings } from '../backend';
 
+// Extended settings with calibration offsets
+export interface ExtendedLabelSettings extends BackendLabelSettings {
+  calibrationOffsetXmm?: number;
+  calibrationOffsetYmm?: number;
+}
+
 interface LabelSettingsState {
-  settings: BackendLabelSettings;
-  setSettings: (settings: BackendLabelSettings) => void;
+  settings: ExtendedLabelSettings;
+  setSettings: (settings: ExtendedLabelSettings) => void;
   resetToDefaults: () => void;
 }
 
@@ -18,24 +24,29 @@ const createDefaultLayout = (x: number, y: number, width: number, height: number
   fontSize: BigInt(fontSize),
 });
 
-// Default settings optimized for 48x30mm label with improved spacing
-const defaultSettings: BackendLabelSettings = {
+// Updated default settings for 48x30mm label with left-aligned layout
+// Consistent left padding (X=2mm) for all elements
+// Improved vertical spacing with second barcode+serial moved lower
+const defaultSettings: ExtendedLabelSettings = {
   widthMm: BigInt(48),
   heightMm: BigInt(30),
   barcodeType: 'CODE128',
   barcodeHeight: BigInt(8),
   spacing: BigInt(3),
   prefixMappings: [],
-  // Title at top with good margins
+  // Title at top with consistent left padding
   titleLayout: createDefaultLayout(2, 1, 44, 4, 10),
-  // First barcode below title (centered via CPCL generator)
+  // First barcode with left padding (X=2mm acts as left padding, not center)
   barcode1Layout: createDefaultLayout(2, 6, 44, 8, 8),
   // First serial text below first barcode
   serialText1Layout: createDefaultLayout(2, 15, 44, 2, 7),
-  // Second barcode moved down for better spacing (centered via CPCL generator)
-  barcode2Layout: createDefaultLayout(2, 19, 44, 8, 8),
-  // Second serial text moved down with barcode 2
-  serialText2Layout: createDefaultLayout(2, 28, 44, 2, 7),
+  // Second barcode moved significantly lower for better separation
+  barcode2Layout: createDefaultLayout(2, 18, 44, 8, 8),
+  // Second serial text below second barcode
+  serialText2Layout: createDefaultLayout(2, 27, 44, 2, 7),
+  // Calibration offsets (default 0mm)
+  calibrationOffsetXmm: 0,
+  calibrationOffsetYmm: 0,
 };
 
 // Custom storage that handles BigInt serialization with corruption fallback
@@ -78,13 +89,34 @@ const bigIntStorage = {
 };
 
 // Migration function to convert old settings to new layout structure
-function migrateSettings(settings: any): BackendLabelSettings {
-  // If already has new layout structure, return as-is
+function migrateSettings(settings: any, version: number): ExtendedLabelSettings {
+  // If already has new layout structure, check if it needs updates
   if (settings.titleLayout && settings.barcode1Layout) {
-    return settings as BackendLabelSettings;
+    // Check if this is the old default layout (version 2) that needs updating
+    const isOldDefault = 
+      Number(settings.barcode2Layout?.y || 0) === 19 && 
+      Number(settings.serialText2Layout?.y || 0) === 28;
+    
+    if (version < 3 && isOldDefault) {
+      // Apply new default layout with better spacing
+      return {
+        ...settings,
+        barcode2Layout: createDefaultLayout(2, 18, 44, 8, 8),
+        serialText2Layout: createDefaultLayout(2, 27, 44, 2, 7),
+        calibrationOffsetXmm: settings.calibrationOffsetXmm ?? 0,
+        calibrationOffsetYmm: settings.calibrationOffsetYmm ?? 0,
+      };
+    }
+    
+    // Ensure calibration offsets exist (version 4 migration)
+    return {
+      ...settings,
+      calibrationOffsetXmm: settings.calibrationOffsetXmm ?? 0,
+      calibrationOffsetYmm: settings.calibrationOffsetYmm ?? 0,
+    } as ExtendedLabelSettings;
   }
 
-  // Migrate from old structure
+  // Migrate from old structure (version 0 or 1)
   const widthMm = Number(settings.widthMm || 48);
   const heightMm = Number(settings.heightMm || 30);
   const barcodeHeight = Number(settings.barcodeHeight || 8);
@@ -110,6 +142,8 @@ function migrateSettings(settings: any): BackendLabelSettings {
     serialText1Layout: createDefaultLayout(2, serial1Y, widthMm - 4, 2, fontSize),
     barcode2Layout: createDefaultLayout(2, barcode2Y, widthMm - 4, barcodeHeight, fontSize),
     serialText2Layout: createDefaultLayout(2, serial2Y, widthMm - 4, 2, fontSize),
+    calibrationOffsetXmm: 0,
+    calibrationOffsetYmm: 0,
   };
 }
 
@@ -123,12 +157,12 @@ export const useLabelSettings = create<LabelSettingsState>()(
     {
       name: 'label-settings',
       storage: createJSONStorage(() => bigIntStorage),
-      version: 2,
+      version: 4, // Bumped to 4 for calibration offsets
       migrate: (persistedState: any, version: number) => {
-        if (version === 0 || version === 1) {
-          // Migrate old settings to new layout structure
+        if (version < 4) {
+          // Migrate old settings to new layout structure with calibration offsets
           const migratedSettings = persistedState.settings
-            ? migrateSettings(persistedState.settings)
+            ? migrateSettings(persistedState.settings, version)
             : defaultSettings;
           return {
             settings: migratedSettings,
@@ -150,14 +184,14 @@ export const useLabelSettings = create<LabelSettingsState>()(
 /**
  * Get current settings synchronously (for use outside React components)
  */
-export function getCurrentSettings(): BackendLabelSettings {
+export function getCurrentSettings(): ExtendedLabelSettings {
   return useLabelSettings.getState().settings;
 }
 
 /**
  * Update persisted settings directly (for use in components)
  */
-export function updatePersistedSettings(settings: BackendLabelSettings): void {
+export function updatePersistedSettings(settings: ExtendedLabelSettings): void {
   useLabelSettings.getState().setSettings(settings);
 }
 

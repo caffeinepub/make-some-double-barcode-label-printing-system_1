@@ -1,63 +1,98 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Label Settings: print test label matching the live preview",
+  "title": "Fix barcode alignment to match preview in CPCL printouts",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Add a \"Print test label\" action beside the Label Preview that prints exactly what the preview currently shows, with progress and error handling when no printer is connected.",
+      "summary": "Adjust CPCL barcode generation parameters to ensure barcodes fit completely within label boundaries",
       "acceptanceCriteria": [
-        "Label Settings > Label Preview area contains a \"Print test label\" action placed adjacent to the preview (e.g., in the preview card header/actions).",
-        "Clicking \"Print test label\" sends a print job to the currently connected printer using the current in-tab label settings and the exact values currently shown in the preview (sample serial 1, sample serial 2, and the title displayed in the preview).",
-        "If no printer is connected, clicking the action does not crash and instead shows a clear error toast (English) explaining that a printer must be connected (and that the user can connect it in the Devices tab).",
-        "While the test label is being sent, the UI indicates progress (e.g., disables the button and shows a \"Printing…\" label) and re-enables after completion/failure."
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/tabs/LabelSettingsTab.tsx",
-          "operation": "modify",
-          "description": "Add a \"Print test label\" button in the Label Preview card header/actions. Wire it to the existing printer connection state (usePrinterService) to (1) guard when no printer is connected by showing an English sonner toast directing users to the Devices tab, (2) send CPCL built from the current in-tab preview settings + current preview serial/title, and (3) show progress (disable button + label \"Printing…\") with success/failure toasts."
-        }
-      ]
-    },
-    {
-      "id": "REQ-2",
-      "summary": "Refactor LabelPreview so LabelSettingsTab can read the exact preview values (sample serials and computed title) at print time without changing preview behavior.",
-      "acceptanceCriteria": [
-        "LabelPreview no longer keeps the preview-critical values exclusively internal; LabelSettingsTab can read the current sample serial values and the title shown in the preview at the moment the user clicks \"Print test label\".",
-        "Changing sample serial inputs in the preview updates the values used for \"Print test label\" without requiring a page refresh.",
-        "The preview rendering behavior remains unchanged (zoom controls, layout, and sample serial inputs still work)."
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/printing/LabelPreview.tsx",
-          "operation": "modify",
-          "description": "Refactor LabelPreview to accept controlled props (sampleSerial1, sampleSerial2, and previewTitle) and change handlers (onSampleSerial1Change/onSampleSerial2Change) so the parent can always access the exact displayed values, while preserving existing zoom controls and rendering."
-        },
-        {
-          "path": "frontend/src/tabs/LabelSettingsTab.tsx",
-          "operation": "modify",
-          "description": "Lift preview-critical state (sampleSerial1, sampleSerial2, and the computed preview title) into LabelSettingsTab, pass them into LabelPreview as controlled props, and ensure the preview uses the same in-tab (possibly unsaved) label settings object that will be used for printing."
-        }
-      ]
-    },
-    {
-      "id": "REQ-3",
-      "summary": "Adjust CPCL generation so the Label Settings preview test print can print with an explicit title that matches the preview title, without breaking existing print flows.",
-      "acceptanceCriteria": [
-        "The CPCL used by \"Print test label\" uses the same layout settings as the preview and includes the same title text shown in the preview, even when prefix mappings are empty or do not match a prefix.",
-        "The implementation does not break existing print flows that use the current CPCL generator (e.g., Scan & Print, Devices tab test print)."
+        "Barcodes are fully visible on printed labels without any clipping at edges",
+        "Both upper and lower barcodes fit completely within the label boundaries"
       ],
       "file_operations": [
         {
           "path": "frontend/src/printing/cpclGenerator.ts",
           "operation": "modify",
-          "description": "Add CPCL generation support for an explicit title (e.g., a new exported function dedicated to preview printing, or an optional parameter) that bypasses prefix-mapping title lookup when provided, while keeping the existing generateCPCL call signature/behavior for current flows intact."
+          "description": "Review and adjust barcode generation parameters including barcode height calculation, scale clamping logic, and CPCL command string construction. Ensure barcode dimensions account for CPCL printer coordinate system and margins to prevent edge clipping. Verify barcode height does not exceed available vertical space after accounting for text elements and spacing. Add defensive bounds checking before generating CPCL BARCODE commands."
         },
         {
-          "path": "frontend/src/tabs/LabelSettingsTab.tsx",
+          "path": "frontend/src/printing/cpclLayoutAdjustments.ts",
           "operation": "modify",
-          "description": "Update the new \"Print test label\" action to call the explicit-title CPCL generator so printing matches the preview title even when prefix mappings are empty or do not match."
+          "description": "Refine barcode positioning and clamping utilities to ensure barcodes remain fully within label boundaries. Review and adjust the CODE128 barcode width estimation logic to accurately reflect actual printed dimensions for center alignment calculations. Update clampBarcodePosition to account for true barcode width including quiet zones. Ensure horizontal positioning calculations prevent any barcode overflow beyond label edges."
+        }
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "summary": "Calibrate barcode positioning calculations to match CPCL printer coordinate system and ensure printout matches preview",
+      "acceptanceCriteria": [
+        "Printed label layout matches the preview display pixel-for-pixel",
+        "Barcode horizontal positioning on printout matches preview positioning",
+        "Text and barcode vertical spacing matches preview"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/printing/cpclLayoutAdjustments.ts",
+          "operation": "modify",
+          "description": "Calibrate coordinate transformations between logical layout coordinates and CPCL printer dots. Review centerAlignBarcode function to ensure it accurately calculates barcode center positions accounting for CPCL's coordinate origin and any printer-specific offsets. Adjust positioning logic to match the preview's visual layout when translated to CPCL commands. Verify calibration offset application is consistent between preview and print generation."
+        },
+        {
+          "path": "frontend/src/printing/cpclGenerator.ts",
+          "operation": "modify",
+          "description": "Ensure CPCL command generation applies the same coordinate transformations and calibration offsets used in the preview rendering. Verify that barcode and text positioning in the generated CPCL string matches the calculated positions used by LabelPreview. Add validation to ensure vertical spacing between elements (title, barcodes, serial text) is preserved in the CPCL output."
+        },
+        {
+          "path": "frontend/src/printing/LabelPreview.tsx",
+          "operation": "modify",
+          "description": "Review preview coordinate transformations to ensure they accurately represent the CPCL printer's coordinate system. Verify that calibration offsets and center-aligned barcode positioning adjustments in the preview match those applied in cpclGenerator. Ensure the preview's SVG barcode dimensions and positions reflect the actual printed output by using the same width estimation and positioning calculations."
+        }
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "summary": "Review and adjust barcode width estimation logic for CODE128 barcodes to accurately calculate dimensions for CPCL output",
+      "acceptanceCriteria": [
+        "Barcode width calculations accurately reflect actual printed dimensions",
+        "Center alignment calculations use correct barcode width values",
+        "No barcode overflow beyond label edges"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/printing/cpclLayoutAdjustments.ts",
+          "operation": "modify",
+          "description": "Review the estimateCode128BarcodeWidth function to ensure it accurately models the actual printed barcode width for CODE128 symbology in CPCL. Verify the calculation accounts for start/stop characters, check digits, narrow/wide bar ratios, and the configured scale factor. Cross-reference against CPCL barcode width behavior and adjust the estimation formula if needed. Update clamping logic to use the corrected width estimation to prevent barcodes from exceeding label boundaries."
+        },
+        {
+          "path": "frontend/src/printing/cpclBarcodeMapping.ts",
+          "operation": "modify",
+          "description": "Review the CODE128 barcode mapping parameters (width, ratio) to ensure they align with CPCL printer behavior and the width estimation logic in cpclLayoutAdjustments. Verify that the recommended parameters produce barcodes that match the estimated dimensions. Adjust parameters if discrepancies are found between estimated and actual printed widths."
+        }
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "summary": "Update LabelPreview to accurately represent CPCL printer output with correct scaling and positioning",
+      "acceptanceCriteria": [
+        "Preview display accurately represents what will be printed via CPCL",
+        "Barcode dimensions in preview match printed barcode dimensions",
+        "Element positioning in preview matches physical printout positions"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/printing/LabelPreview.tsx",
+          "operation": "modify",
+          "description": "Update the preview rendering to use the same barcode width estimation logic from cpclLayoutAdjustments for sizing the SVG barcode elements. Ensure barcode and text positioning in the preview applies the same coordinate transformations, calibration offsets, and center-alignment adjustments used in cpclGenerator. Verify that the preview's scale factor and unit conversions match the CPCL printer's 203 DPI output. Add visual debugging aids if needed to compare preview vs. printed layout."
+        },
+        {
+          "path": "frontend/src/printing/previewUnits.ts",
+          "operation": "modify",
+          "description": "Review and verify that unit conversion functions (millimeters to printer dots, dots to CSS pixels) accurately represent the CPCL printer's 203 DPI resolution. Ensure the conversion constants match the actual printer behavior and that the preview scaling faithfully reproduces printed dimensions. Adjust conversion factors if discrepancies are found between preview and physical printout measurements."
+        },
+        {
+          "path": "frontend/src/printing/barcodePreview.ts",
+          "operation": "modify",
+          "description": "Review the SVG barcode generation logic to ensure the deterministic bar pattern widths and spacing match the actual CODE128 barcode dimensions produced by the CPCL printer. Verify that the preview barcode's visual width corresponds to the estimated width used in layout calculations. Adjust bar widths or quiet zones if the preview does not visually match the printed barcode size."
         }
       ]
     }

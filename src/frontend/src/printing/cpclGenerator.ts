@@ -1,4 +1,5 @@
 import type { LabelSettings as BackendLabelSettings } from '../backend';
+import type { ExtendedLabelSettings } from '../state/labelSettingsStore';
 import { addLog } from '../state/logStore';
 import { getBarcodeMapping, isBarcodeTypeSupported } from './cpclBarcodeMapping';
 import {
@@ -8,10 +9,11 @@ import {
   logBarcodeGeneration,
 } from './cpclBarcodeDiagnostics';
 import {
-  calculateCenteredBarcodeX,
+  calculateLeftAlignedBarcodeX,
   estimateBarcodeWidthDots,
   type BarcodeAdjustment,
 } from './cpclLayoutAdjustments';
+import { mmToDots, DPI } from './previewUnits';
 
 /**
  * Clamp SETMAG scale values to safe minimum
@@ -44,10 +46,8 @@ function calculateBarcodeHeight(
   heightMm: number,
   scale: number,
   elementName: string,
-  dpi: number,
   barcodeIndex: 1 | 2
 ): number {
-  const mmToDots = (mm: number): number => Math.round((mm / 25.4) * dpi);
   const heightDots = mmToDots(heightMm * scale);
 
   if (heightDots <= 0 || !isFinite(heightDots)) {
@@ -100,10 +100,76 @@ export function generateTestPrintCPCL(): string {
 }
 
 /**
+ * Generate a calibration pattern CPCL payload
+ * Prints a border frame and origin marker to help identify print offset issues
+ */
+export function generateCalibrationPatternCPCL(widthMm: number, heightMm: number): string {
+  const widthDots = mmToDots(widthMm);
+  const heightDots = mmToDots(heightMm);
+  
+  const lines: string[] = [];
+  lines.push('! 0 200 200 ' + heightDots + ' 1');
+  lines.push('PAGE-WIDTH ' + widthDots);
+  
+  // Draw border frame (4 lines forming a rectangle)
+  // LINE x1 y1 x2 y2 thickness
+  const borderThickness = 2;
+  
+  // Top border
+  lines.push(`LINE 0 0 ${widthDots} 0 ${borderThickness}`);
+  // Right border
+  lines.push(`LINE ${widthDots - borderThickness} 0 ${widthDots - borderThickness} ${heightDots} ${borderThickness}`);
+  // Bottom border
+  lines.push(`LINE 0 ${heightDots - borderThickness} ${widthDots} ${heightDots - borderThickness} ${borderThickness}`);
+  // Left border
+  lines.push(`LINE 0 0 0 ${heightDots} ${borderThickness}`);
+  
+  // Draw origin marker (crosshair at top-left)
+  const crosshairSize = mmToDots(5); // 5mm crosshair
+  const crosshairThickness = 2;
+  
+  // Horizontal line of crosshair
+  lines.push(`LINE 0 ${crosshairSize / 2} ${crosshairSize} ${crosshairSize / 2} ${crosshairThickness}`);
+  // Vertical line of crosshair
+  lines.push(`LINE ${crosshairSize / 2} 0 ${crosshairSize / 2} ${crosshairSize} ${crosshairThickness}`);
+  
+  // Add text label
+  lines.push('TEXT 4 0 ' + mmToDots(10) + ' ' + mmToDots(10) + ' CALIBRATION');
+  lines.push('TEXT 4 0 ' + mmToDots(10) + ' ' + mmToDots(15) + ' PATTERN');
+  
+  lines.push('PRINT');
+  
+  addLog('info', 'Generated calibration pattern CPCL', {
+    category: 'calibration',
+    widthMm,
+    heightMm,
+    widthDots,
+    heightDots,
+  });
+  
+  return lines.join('\n');
+}
+
+/**
+ * Apply calibration offsets to a position (mm)
+ */
+function applyCalibrationOffset(
+  xMm: number,
+  yMm: number,
+  offsetXmm: number,
+  offsetYmm: number
+): { x: number; y: number } {
+  return {
+    x: xMm + offsetXmm,
+    y: yMm + offsetYmm,
+  };
+}
+
+/**
  * Generate CPCL commands from label settings and serial data
  */
 export function generateCPCL(
-  settings: BackendLabelSettings,
+  settings: BackendLabelSettings | ExtendedLabelSettings,
   leftSerial: string,
   rightSerial: string,
   prefix: string
@@ -112,16 +178,17 @@ export function generateCPCL(
   const mapping = mappings.get(prefix);
   const title = mapping?.title || 'Label';
 
-  // Convert bigint to number and mm to dots (assuming 203 DPI)
-  const dpi = 203;
+  // Convert bigint to number and mm to dots
   const widthMm = Number(settings.widthMm);
   const heightMm = Number(settings.heightMm);
 
-  const widthDots = Math.round((widthMm / 25.4) * dpi);
-  const heightDots = Math.round((heightMm / 25.4) * dpi);
+  const widthDots = mmToDots(widthMm);
+  const heightDots = mmToDots(heightMm);
 
-  // Helper to convert mm to dots
-  const mmToDots = (mm: number): number => Math.round((mm / 25.4) * dpi);
+  // Get calibration offsets (default to 0 if not present)
+  const extendedSettings = settings as ExtendedLabelSettings;
+  const offsetXmm = extendedSettings.calibrationOffsetXmm ?? 0;
+  const offsetYmm = extendedSettings.calibrationOffsetYmm ?? 0;
 
   // Get barcode mapping with fallback
   const uiType = settings.barcodeType;
@@ -157,49 +224,46 @@ export function generateCPCL(
   lines.push('! 0 200 200 ' + heightDots + ' 1');
   lines.push('PAGE-WIDTH ' + widthDots);
 
-  // Title
-  const titleX = mmToDots(Number(titleLayout.x));
-  const titleY = mmToDots(Number(titleLayout.y));
+  // Title - apply calibration offset
+  const titlePos = applyCalibrationOffset(
+    Number(titleLayout.x),
+    Number(titleLayout.y),
+    offsetXmm,
+    offsetYmm
+  );
+  const titleX = mmToDots(titlePos.x);
+  const titleY = mmToDots(titlePos.y);
   const titleScaleX = clampScale(titleLayout.scale, 'Title X');
   const titleScaleY = clampScale(titleLayout.scale, 'Title Y');
   lines.push(`SETMAG ${titleScaleX} ${titleScaleY}`);
   lines.push(`TEXT 4 0 ${titleX} ${titleY} ${title}`);
   lines.push(`SETMAG 1 1`);
 
-  // Barcode 1 - with centering and clamp adjustment
+  // Barcode 1 - with left-aligned clamp adjustment and calibration offset
   const barcode1HeightMm = Number(barcode1Layout.height);
   const barcode1Scale = barcode1Layout.scale;
-  const barcode1Height = calculateBarcodeHeight(barcode1HeightMm, barcode1Scale, 'Barcode 1', dpi, 1);
+  const barcode1Height = calculateBarcodeHeight(barcode1HeightMm, barcode1Scale, 'Barcode 1', 1);
 
-  // Estimate barcode width and calculate centered X
+  // Apply calibration offset to barcode 1 position
+  const barcode1Pos = applyCalibrationOffset(
+    Number(barcode1Layout.x),
+    Number(barcode1Layout.y),
+    offsetXmm,
+    offsetYmm
+  );
+
+  // Estimate barcode width and calculate left-aligned X with clamp (using offset-adjusted X)
   const barcode1WidthEstimate = estimateBarcodeWidthDots(leftSerial.length, barcodeWidth, barcodeRatio);
-  const barcode1RequestedX = mmToDots(Number(barcode1Layout.x));
-  const barcode1Adjustment = calculateCenteredBarcodeX(
+  const barcode1RequestedX = mmToDots(barcode1Pos.x);
+  const barcode1Adjustment = calculateLeftAlignedBarcodeX(
     barcode1WidthEstimate,
     widthDots,
     barcode1RequestedX,
     1
   );
 
-  // Log adjustment if barcode was clamped
-  if (barcode1Adjustment.wasClamped || barcode1Adjustment.adjustedX !== barcode1RequestedX) {
-    addLog(
-      'warn',
-      `Barcode 1 X position adjusted for centering/clipping prevention: ${barcode1RequestedX} → ${barcode1Adjustment.adjustedX} dots`,
-      {
-        category: 'barcode',
-        barcodeIndex: 1,
-        reasonCode: 'POSITION_ADJUSTED',
-        originalX: barcode1RequestedX,
-        adjustedX: barcode1Adjustment.adjustedX,
-        estimatedWidth: barcode1WidthEstimate,
-        labelWidth: widthDots,
-      }
-    );
-  }
-
   const barcode1X = barcode1Adjustment.adjustedX;
-  const barcode1Y = mmToDots(Number(barcode1Layout.y));
+  const barcode1Y = mmToDots(barcode1Pos.y);
 
   // Validate position
   validateBarcodePosition(barcode1X, barcode1Y, barcode1Height, widthDots, heightDots, 1);
@@ -221,49 +285,46 @@ export function generateCPCL(
     wasFallback
   );
 
-  // Serial Text 1
-  const serial1X = mmToDots(Number(serial1Layout.x));
-  const serial1Y = mmToDots(Number(serial1Layout.y));
+  // Serial Text 1 - apply calibration offset
+  const serial1Pos = applyCalibrationOffset(
+    Number(serial1Layout.x),
+    Number(serial1Layout.y),
+    offsetXmm,
+    offsetYmm
+  );
+  const serial1X = mmToDots(serial1Pos.x);
+  const serial1Y = mmToDots(serial1Pos.y);
   const serial1ScaleX = clampScale(serial1Layout.scale, 'Serial Text 1 X');
   const serial1ScaleY = clampScale(serial1Layout.scale, 'Serial Text 1 Y');
   lines.push(`SETMAG ${serial1ScaleX} ${serial1ScaleY}`);
   lines.push(`TEXT 7 0 ${serial1X} ${serial1Y} ${leftSerial}`);
   lines.push(`SETMAG 1 1`);
 
-  // Barcode 2 - with centering and clamp adjustment
+  // Barcode 2 - with left-aligned clamp adjustment and calibration offset
   const barcode2HeightMm = Number(barcode2Layout.height);
   const barcode2Scale = barcode2Layout.scale;
-  const barcode2Height = calculateBarcodeHeight(barcode2HeightMm, barcode2Scale, 'Barcode 2', dpi, 2);
+  const barcode2Height = calculateBarcodeHeight(barcode2HeightMm, barcode2Scale, 'Barcode 2', 2);
 
-  // Estimate barcode width and calculate centered X
+  // Apply calibration offset to barcode 2 position
+  const barcode2Pos = applyCalibrationOffset(
+    Number(barcode2Layout.x),
+    Number(barcode2Layout.y),
+    offsetXmm,
+    offsetYmm
+  );
+
+  // Estimate barcode width and calculate left-aligned X with clamp (using offset-adjusted X)
   const barcode2WidthEstimate = estimateBarcodeWidthDots(rightSerial.length, barcodeWidth, barcodeRatio);
-  const barcode2RequestedX = mmToDots(Number(barcode2Layout.x));
-  const barcode2Adjustment = calculateCenteredBarcodeX(
+  const barcode2RequestedX = mmToDots(barcode2Pos.x);
+  const barcode2Adjustment = calculateLeftAlignedBarcodeX(
     barcode2WidthEstimate,
     widthDots,
     barcode2RequestedX,
     2
   );
 
-  // Log adjustment if barcode was clamped
-  if (barcode2Adjustment.wasClamped || barcode2Adjustment.adjustedX !== barcode2RequestedX) {
-    addLog(
-      'warn',
-      `Barcode 2 X position adjusted for centering/clipping prevention: ${barcode2RequestedX} → ${barcode2Adjustment.adjustedX} dots`,
-      {
-        category: 'barcode',
-        barcodeIndex: 2,
-        reasonCode: 'POSITION_ADJUSTED',
-        originalX: barcode2RequestedX,
-        adjustedX: barcode2Adjustment.adjustedX,
-        estimatedWidth: barcode2WidthEstimate,
-        labelWidth: widthDots,
-      }
-    );
-  }
-
   const barcode2X = barcode2Adjustment.adjustedX;
-  const barcode2Y = mmToDots(Number(barcode2Layout.y));
+  const barcode2Y = mmToDots(barcode2Pos.y);
 
   // Validate position
   validateBarcodePosition(barcode2X, barcode2Y, barcode2Height, widthDots, heightDots, 2);
@@ -285,9 +346,15 @@ export function generateCPCL(
     wasFallback
   );
 
-  // Serial Text 2
-  const serial2X = mmToDots(Number(serial2Layout.x));
-  const serial2Y = mmToDots(Number(serial2Layout.y));
+  // Serial Text 2 - apply calibration offset
+  const serial2Pos = applyCalibrationOffset(
+    Number(serial2Layout.x),
+    Number(serial2Layout.y),
+    offsetXmm,
+    offsetYmm
+  );
+  const serial2X = mmToDots(serial2Pos.x);
+  const serial2Y = mmToDots(serial2Pos.y);
   const serial2ScaleX = clampScale(serial2Layout.scale, 'Serial Text 2 X');
   const serial2ScaleY = clampScale(serial2Layout.scale, 'Serial Text 2 Y');
   lines.push(`SETMAG ${serial2ScaleX} ${serial2ScaleY}`);
@@ -304,21 +371,22 @@ export function generateCPCL(
  * This bypasses prefix mapping lookup and uses the provided title directly
  */
 export function generateCPCLWithTitle(
-  settings: BackendLabelSettings,
+  settings: BackendLabelSettings | ExtendedLabelSettings,
   leftSerial: string,
   rightSerial: string,
   title: string
 ): string {
-  // Convert bigint to number and mm to dots (assuming 203 DPI)
-  const dpi = 203;
+  // Convert bigint to number and mm to dots
   const widthMm = Number(settings.widthMm);
   const heightMm = Number(settings.heightMm);
 
-  const widthDots = Math.round((widthMm / 25.4) * dpi);
-  const heightDots = Math.round((heightMm / 25.4) * dpi);
+  const widthDots = mmToDots(widthMm);
+  const heightDots = mmToDots(heightMm);
 
-  // Helper to convert mm to dots
-  const mmToDots = (mm: number): number => Math.round((mm / 25.4) * dpi);
+  // Get calibration offsets (default to 0 if not present)
+  const extendedSettings = settings as ExtendedLabelSettings;
+  const offsetXmm = extendedSettings.calibrationOffsetXmm ?? 0;
+  const offsetYmm = extendedSettings.calibrationOffsetYmm ?? 0;
 
   // Get barcode mapping with fallback
   const uiType = settings.barcodeType;
@@ -354,49 +422,46 @@ export function generateCPCLWithTitle(
   lines.push('! 0 200 200 ' + heightDots + ' 1');
   lines.push('PAGE-WIDTH ' + widthDots);
 
-  // Title (using explicit title parameter)
-  const titleX = mmToDots(Number(titleLayout.x));
-  const titleY = mmToDots(Number(titleLayout.y));
+  // Title (using explicit title parameter) - apply calibration offset
+  const titlePos = applyCalibrationOffset(
+    Number(titleLayout.x),
+    Number(titleLayout.y),
+    offsetXmm,
+    offsetYmm
+  );
+  const titleX = mmToDots(titlePos.x);
+  const titleY = mmToDots(titlePos.y);
   const titleScaleX = clampScale(titleLayout.scale, 'Title X');
   const titleScaleY = clampScale(titleLayout.scale, 'Title Y');
   lines.push(`SETMAG ${titleScaleX} ${titleScaleY}`);
   lines.push(`TEXT 4 0 ${titleX} ${titleY} ${title}`);
   lines.push(`SETMAG 1 1`);
 
-  // Barcode 1 - with centering and clamp adjustment
+  // Barcode 1 - with left-aligned clamp adjustment and calibration offset
   const barcode1HeightMm = Number(barcode1Layout.height);
   const barcode1Scale = barcode1Layout.scale;
-  const barcode1Height = calculateBarcodeHeight(barcode1HeightMm, barcode1Scale, 'Barcode 1', dpi, 1);
+  const barcode1Height = calculateBarcodeHeight(barcode1HeightMm, barcode1Scale, 'Barcode 1', 1);
 
-  // Estimate barcode width and calculate centered X
+  // Apply calibration offset to barcode 1 position
+  const barcode1Pos = applyCalibrationOffset(
+    Number(barcode1Layout.x),
+    Number(barcode1Layout.y),
+    offsetXmm,
+    offsetYmm
+  );
+
+  // Estimate barcode width and calculate left-aligned X with clamp (using offset-adjusted X)
   const barcode1WidthEstimate = estimateBarcodeWidthDots(leftSerial.length, barcodeWidth, barcodeRatio);
-  const barcode1RequestedX = mmToDots(Number(barcode1Layout.x));
-  const barcode1Adjustment = calculateCenteredBarcodeX(
+  const barcode1RequestedX = mmToDots(barcode1Pos.x);
+  const barcode1Adjustment = calculateLeftAlignedBarcodeX(
     barcode1WidthEstimate,
     widthDots,
     barcode1RequestedX,
     1
   );
 
-  // Log adjustment if barcode was clamped
-  if (barcode1Adjustment.wasClamped || barcode1Adjustment.adjustedX !== barcode1RequestedX) {
-    addLog(
-      'warn',
-      `Barcode 1 X position adjusted for centering/clipping prevention: ${barcode1RequestedX} → ${barcode1Adjustment.adjustedX} dots`,
-      {
-        category: 'barcode',
-        barcodeIndex: 1,
-        reasonCode: 'POSITION_ADJUSTED',
-        originalX: barcode1RequestedX,
-        adjustedX: barcode1Adjustment.adjustedX,
-        estimatedWidth: barcode1WidthEstimate,
-        labelWidth: widthDots,
-      }
-    );
-  }
-
   const barcode1X = barcode1Adjustment.adjustedX;
-  const barcode1Y = mmToDots(Number(barcode1Layout.y));
+  const barcode1Y = mmToDots(barcode1Pos.y);
 
   // Validate position
   validateBarcodePosition(barcode1X, barcode1Y, barcode1Height, widthDots, heightDots, 1);
@@ -418,49 +483,46 @@ export function generateCPCLWithTitle(
     wasFallback
   );
 
-  // Serial Text 1
-  const serial1X = mmToDots(Number(serial1Layout.x));
-  const serial1Y = mmToDots(Number(serial1Layout.y));
+  // Serial Text 1 - apply calibration offset
+  const serial1Pos = applyCalibrationOffset(
+    Number(serial1Layout.x),
+    Number(serial1Layout.y),
+    offsetXmm,
+    offsetYmm
+  );
+  const serial1X = mmToDots(serial1Pos.x);
+  const serial1Y = mmToDots(serial1Pos.y);
   const serial1ScaleX = clampScale(serial1Layout.scale, 'Serial Text 1 X');
   const serial1ScaleY = clampScale(serial1Layout.scale, 'Serial Text 1 Y');
   lines.push(`SETMAG ${serial1ScaleX} ${serial1ScaleY}`);
   lines.push(`TEXT 7 0 ${serial1X} ${serial1Y} ${leftSerial}`);
   lines.push(`SETMAG 1 1`);
 
-  // Barcode 2 - with centering and clamp adjustment
+  // Barcode 2 - with left-aligned clamp adjustment and calibration offset
   const barcode2HeightMm = Number(barcode2Layout.height);
   const barcode2Scale = barcode2Layout.scale;
-  const barcode2Height = calculateBarcodeHeight(barcode2HeightMm, barcode2Scale, 'Barcode 2', dpi, 2);
+  const barcode2Height = calculateBarcodeHeight(barcode2HeightMm, barcode2Scale, 'Barcode 2', 2);
 
-  // Estimate barcode width and calculate centered X
+  // Apply calibration offset to barcode 2 position
+  const barcode2Pos = applyCalibrationOffset(
+    Number(barcode2Layout.x),
+    Number(barcode2Layout.y),
+    offsetXmm,
+    offsetYmm
+  );
+
+  // Estimate barcode width and calculate left-aligned X with clamp (using offset-adjusted X)
   const barcode2WidthEstimate = estimateBarcodeWidthDots(rightSerial.length, barcodeWidth, barcodeRatio);
-  const barcode2RequestedX = mmToDots(Number(barcode2Layout.x));
-  const barcode2Adjustment = calculateCenteredBarcodeX(
+  const barcode2RequestedX = mmToDots(barcode2Pos.x);
+  const barcode2Adjustment = calculateLeftAlignedBarcodeX(
     barcode2WidthEstimate,
     widthDots,
     barcode2RequestedX,
     2
   );
 
-  // Log adjustment if barcode was clamped
-  if (barcode2Adjustment.wasClamped || barcode2Adjustment.adjustedX !== barcode2RequestedX) {
-    addLog(
-      'warn',
-      `Barcode 2 X position adjusted for centering/clipping prevention: ${barcode2RequestedX} → ${barcode2Adjustment.adjustedX} dots`,
-      {
-        category: 'barcode',
-        barcodeIndex: 2,
-        reasonCode: 'POSITION_ADJUSTED',
-        originalX: barcode2RequestedX,
-        adjustedX: barcode2Adjustment.adjustedX,
-        estimatedWidth: barcode2WidthEstimate,
-        labelWidth: widthDots,
-      }
-    );
-  }
-
   const barcode2X = barcode2Adjustment.adjustedX;
-  const barcode2Y = mmToDots(Number(barcode2Layout.y));
+  const barcode2Y = mmToDots(barcode2Pos.y);
 
   // Validate position
   validateBarcodePosition(barcode2X, barcode2Y, barcode2Height, widthDots, heightDots, 2);
@@ -482,9 +544,15 @@ export function generateCPCLWithTitle(
     wasFallback
   );
 
-  // Serial Text 2
-  const serial2X = mmToDots(Number(serial2Layout.x));
-  const serial2Y = mmToDots(Number(serial2Layout.y));
+  // Serial Text 2 - apply calibration offset
+  const serial2Pos = applyCalibrationOffset(
+    Number(serial2Layout.x),
+    Number(serial2Layout.y),
+    offsetXmm,
+    offsetYmm
+  );
+  const serial2X = mmToDots(serial2Pos.x);
+  const serial2Y = mmToDots(serial2Pos.y);
   const serial2ScaleX = clampScale(serial2Layout.scale, 'Serial Text 2 X');
   const serial2ScaleY = clampScale(serial2Layout.scale, 'Serial Text 2 Y');
   lines.push(`SETMAG ${serial2ScaleX} ${serial2ScaleY}`);
@@ -492,13 +560,6 @@ export function generateCPCLWithTitle(
   lines.push(`SETMAG 1 1`);
 
   lines.push('PRINT');
-
-  addLog('info', 'Generated test print CPCL with explicit title', {
-    category: 'printer',
-    title,
-    leftSerial,
-    rightSerial,
-  });
 
   return lines.join('\n');
 }

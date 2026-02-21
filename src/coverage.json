@@ -1,50 +1,64 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-11T21:38:01.807Z",
+  "generatedAt": "2026-02-21T09:18:48.959Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 3,
-    "implemented": 3,
+    "total": 4,
+    "implemented": 4,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "In the Label Settings tab, add a user-visible action next to the Label Preview that prints a test label matching the current preview (including the current sample serial inputs and the preview title). Use English for the button label and any related UI text (e.g., \"Print test label\").",
+        "summary": "Adjust CPCL barcode generation parameters in cpclGenerator.ts to ensure barcodes fit completely within the label boundaries when printed using CPCL protocol",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/tabs/LabelSettingsTab.tsx"
+          "frontend/src/printing/cpclGenerator.ts",
+          "frontend/src/printing/cpclLayoutAdjustments.ts"
         ],
         "matchedFiles": [
-          "frontend/src/tabs/LabelSettingsTab.tsx"
+          "frontend/src/printing/cpclLayoutAdjustments.ts"
         ]
       },
       {
         "id": "REQ-2",
-        "summary": "Refactor the Label Preview component so the parent (LabelSettingsTab) can access the exact preview data currently being displayed (at minimum: sample serial 1, sample serial 2, and the computed preview title), so the new \"Print test label\" action can print exactly what is shown.",
+        "summary": "Calibrate barcode positioning calculations in cpclLayoutAdjustments.ts to account for CPCL printer coordinate system and ensure printout matches the preview shown in the uploaded photo",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/printing/LabelPreview.tsx",
-          "frontend/src/tabs/LabelSettingsTab.tsx"
+          "frontend/src/printing/cpclLayoutAdjustments.ts",
+          "frontend/src/printing/cpclGenerator.ts",
+          "frontend/src/printing/LabelPreview.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/printing/LabelPreview.tsx",
-          "frontend/src/tabs/LabelSettingsTab.tsx"
+          "frontend/src/printing/cpclLayoutAdjustments.ts",
+          "frontend/src/printing/LabelPreview.tsx"
         ]
       },
       {
         "id": "REQ-3",
-        "summary": "Add/adjust CPCL generation support so printing from the Label Settings preview does not depend on prefix mappings to determine the printed title; it must be able to print with an explicit title matching the preview title.",
+        "summary": "Review and adjust barcode width estimation logic for CODE128 barcodes in cpclLayoutAdjustments.ts to accurately calculate barcode dimensions for CPCL protocol output",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/printing/cpclGenerator.ts",
-          "frontend/src/tabs/LabelSettingsTab.tsx"
+          "frontend/src/printing/cpclLayoutAdjustments.ts",
+          "frontend/src/printing/cpclBarcodeMapping.ts"
         ],
         "matchedFiles": [
-          "frontend/src/printing/cpclGenerator.ts",
-          "frontend/src/tabs/LabelSettingsTab.tsx"
+          "frontend/src/printing/cpclLayoutAdjustments.ts"
+        ]
+      },
+      {
+        "id": "REQ-4",
+        "summary": "Update LabelPreview.tsx to accurately represent CPCL printer output so the preview matches actual printed results with correct scaling and positioning",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/printing/LabelPreview.tsx",
+          "frontend/src/printing/previewUnits.ts",
+          "frontend/src/printing/barcodePreview.ts"
+        ],
+        "matchedFiles": [
+          "frontend/src/printing/LabelPreview.tsx"
         ]
       }
     ]
@@ -55,8 +69,7 @@
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
     "frontend/src/printing/LabelPreview.tsx",
-    "frontend/src/printing/cpclGenerator.ts",
-    "frontend/src/tabs/LabelSettingsTab.tsx",
+    "frontend/src/printing/cpclLayoutAdjustments.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

@@ -1,45 +1,52 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "New project",
-  "architectural_notes": [],
-  "known_issues": [],
-  "isFixRequest": false,
+  "summary": "Label printing app using CPCL protocol with barcode alignment issues",
+  "architectural_notes": [
+    "Uses CPCL protocol for label printing",
+    "Print output must match on-screen preview exactly",
+    "Barcode positioning critical for label fit"
+  ],
+  "known_issues": [
+    "Barcode not fully fitting on printed label despite preview showing correct positioning"
+  ],
+  "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-in-the-label-settings-tab-add-a-user-visible-action-next-to-the-label-preview-that-prints-a-test-label-matching-the-current-preview-including-the-current-sample-serial-inputs-and-the-preview-title-use-english-for-the-button-label-and-any-related-ui-text-e-g-print-test-label",
-      "title": "In the Label Settings tab, add a user-visible action next to the Label Preview that prints a test label matching the current preview (including the current sample serial inputs and the preview title). Use English for the button label and any related UI text (e.g., \"Print test label\").",
+      "id": "feature-adjust-cpcl-barcode-generation-parameters-in-cpclgenerator-ts-to-ensure-barcodes-fit-completely-within-the-label-boundaries-when-printed-using-cpcl-protocol",
+      "title": "Adjust CPCL barcode generation parameters in cpclGenerator.ts to ensure barcodes fit completely within the label boundaries when printed using CPCL protocol",
       "reqIds": [
         "REQ-1"
       ],
       "version": 1
     },
     {
-      "id": "feature-refactor-the-label-preview-component-so-the-parent-labelsettingstab-can-access-the-exact-preview-data-currently-being-displayed-at-minimum-sample-serial-1-sample-serial-2-and-the-computed-preview-title-so-the-new-print-test-label-action-can-print-exactly-what-is-shown",
-      "title": "Refactor the Label Preview component so the parent (LabelSettingsTab) can access the exact preview data currently being displayed (at minimum: sample serial 1, sample serial 2, and the computed preview title), so the new \"Print test label\" action can print exactly what is shown.",
+      "id": "feature-calibrate-barcode-positioning-calculations-in-cpcllayoutadjustments-ts-to-account-for-cpcl-printer-coordinate-system-and-ensure-printout-matches-the-preview-shown-in-the-uploaded-photo",
+      "title": "Calibrate barcode positioning calculations in cpclLayoutAdjustments.ts to account for CPCL printer coordinate system and ensure printout matches the preview shown in the uploaded photo",
       "reqIds": [
         "REQ-2"
       ],
       "version": 1
     },
     {
-      "id": "feature-add-adjust-cpcl-generation-support-so-printing-from-the-label-settings-preview-does-not-depend-on-prefix-mappings-to-determine-the-printed-title-it-must-be-able-to-print-with-an-explicit-title-matching-the-preview-title",
-      "title": "Add/adjust CPCL generation support so printing from the Label Settings preview does not depend on prefix mappings to determine the printed title; it must be able to print with an explicit title matching the preview title.",
+      "id": "feature-review-and-adjust-barcode-width-estimation-logic-for-code128-barcodes-in-cpcllayoutadjustments-ts-to-accurately-calculate-barcode-dimensions-for-cpcl-protocol-output",
+      "title": "Review and adjust barcode width estimation logic for CODE128 barcodes in cpclLayoutAdjustments.ts to accurately calculate barcode dimensions for CPCL protocol output",
       "reqIds": [
         "REQ-3"
       ],
       "version": 1
-    }
-  ],
-  "new_feature_requests": [
+    },
     {
-      "id": "AR-1",
-      "summary": "Add a 'Print test label' option next to Label Preview in label settings to print exactly what is shown in the preview for quick test prints while adjusting settings.",
-      "reqIds": [],
-      "status": "pending"
+      "id": "feature-update-labelpreview-tsx-to-accurately-represent-cpcl-printer-output-so-the-preview-matches-actual-printed-results-with-correct-scaling-and-positioning",
+      "title": "Update LabelPreview.tsx to accurately represent CPCL printer output so the preview matches actual printed results with correct scaling and positioning",
+      "reqIds": [
+        "REQ-4"
+      ],
+      "version": 1
     }
   ],
-  "projectName": "Add 'Print test label' button in Label Settings preview to print exactly what is shown",
+  "new_feature_requests": [],
+  "projectName": "Label Printer",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Save, Plus, Trash2, X, Download, Upload, RotateCcw, Printer } from 'lucide-react';
-import { useLabelSettings, updatePersistedSettings, resetSettingsToDefaults } from '../state/labelSettingsStore';
+import { Save, Plus, Trash2, X, Download, Upload, RotateCcw, Printer, Target } from 'lucide-react';
+import { useLabelSettings, updatePersistedSettings, resetSettingsToDefaults, type ExtendedLabelSettings } from '../state/labelSettingsStore';
 import { useLabelSettingsHydration } from '../state/useLabelSettingsHydration';
 import LabelPreview from '../printing/LabelPreview';
 import SoundEffectsSettings from '../components/SoundEffectsSettings';
@@ -21,7 +21,8 @@ import {
 } from '../utils/labelSettingsImportExport';
 import { validateBarcodeSettings } from '../utils/barcodeSettingsValidation';
 import { usePrinterService } from '../services/printerService';
-import { generateCPCLWithTitle } from '../printing/cpclGenerator';
+import { generateCPCLWithTitle, generateCalibrationPatternCPCL } from '../printing/cpclGenerator';
+import { addLog } from '../state/logStore';
 
 export default function LabelSettingsTab() {
   const { settings } = useLabelSettings();
@@ -35,7 +36,11 @@ export default function LabelSettingsTab() {
   const [spacing, setSpacing] = useState(3);
   const [prefixMappings, setPrefixMappings] = useState<Array<[string, { labelType: string; title: string }]>>([]);
   
-  // Layout settings for each element - defaults for 48x30mm
+  // Calibration offsets
+  const [calibrationOffsetXmm, setCalibrationOffsetXmm] = useState(0);
+  const [calibrationOffsetYmm, setCalibrationOffsetYmm] = useState(0);
+  
+  // Layout settings for each element - updated defaults for left-aligned layout
   const [titleLayout, setTitleLayout] = useState<LayoutSettings>({
     x: BigInt(2),
     y: BigInt(1),
@@ -65,7 +70,7 @@ export default function LabelSettingsTab() {
   
   const [barcode2Layout, setBarcode2Layout] = useState<LayoutSettings>({
     x: BigInt(2),
-    y: BigInt(19),
+    y: BigInt(18),
     scale: 1.0,
     width: BigInt(44),
     height: BigInt(8),
@@ -74,7 +79,7 @@ export default function LabelSettingsTab() {
   
   const [serialText2Layout, setSerialText2Layout] = useState<LayoutSettings>({
     x: BigInt(2),
-    y: BigInt(28),
+    y: BigInt(27),
     scale: 1.0,
     width: BigInt(44),
     height: BigInt(2),
@@ -94,6 +99,7 @@ export default function LabelSettingsTab() {
   
   // Test print state
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isPrintingCalibration, setIsPrintingCalibration] = useState(false);
 
   useEffect(() => {
     if (settings) {
@@ -108,6 +114,11 @@ export default function LabelSettingsTab() {
       setSerialText1Layout(settings.serialText1Layout);
       setBarcode2Layout(settings.barcode2Layout);
       setSerialText2Layout(settings.serialText2Layout);
+      
+      // Load calibration offsets
+      const extendedSettings = settings as ExtendedLabelSettings;
+      setCalibrationOffsetXmm(extendedSettings.calibrationOffsetXmm ?? 0);
+      setCalibrationOffsetYmm(extendedSettings.calibrationOffsetYmm ?? 0);
     }
   }, [settings]);
 
@@ -115,7 +126,7 @@ export default function LabelSettingsTab() {
   const previewTitle = prefixMappings[0]?.[1]?.title || 'Dual Band';
 
   // Build current in-tab settings object for preview and test print
-  const currentSettings = {
+  const currentSettings: ExtendedLabelSettings = {
     widthMm: BigInt(widthMm),
     heightMm: BigInt(heightMm),
     barcodeType,
@@ -127,6 +138,8 @@ export default function LabelSettingsTab() {
     serialText1Layout,
     barcode2Layout,
     serialText2Layout,
+    calibrationOffsetXmm,
+    calibrationOffsetYmm,
   };
 
   const handleSave = async () => {
@@ -239,6 +252,39 @@ export default function LabelSettingsTab() {
     }
   };
 
+  const handlePrintCalibrationPattern = async () => {
+    if (!isConnected) {
+      toast.error('No printer connected. Please connect a printer in the Devices tab.');
+      return;
+    }
+
+    setIsPrintingCalibration(true);
+    try {
+      // Generate calibration pattern CPCL
+      const cpcl = generateCalibrationPatternCPCL(widthMm, heightMm);
+
+      // Send to printer
+      await sendCPCL(cpcl);
+      
+      addLog('info', 'Calibration pattern printed successfully', {
+        category: 'calibration',
+        widthMm,
+        heightMm,
+      });
+      
+      toast.success('Calibration pattern sent to printer');
+    } catch (error: any) {
+      addLog('error', `Calibration pattern print failed: ${error.message}`, {
+        category: 'calibration',
+        error: error.message,
+      });
+      toast.error(`Print failed: ${error.message || 'Unknown error'}`);
+      console.error('Calibration pattern print error:', error);
+    } finally {
+      setIsPrintingCalibration(false);
+    }
+  };
+
   const addPrefixMapping = () => {
     setPrefixMappings([...prefixMappings, ['', { labelType: 'dualBand', title: '' }]]);
   };
@@ -286,78 +332,33 @@ export default function LabelSettingsTab() {
     }
   };
 
-  // Get all label types
-  const allLabelTypeInfos = getAllLabelTypes(prefixMappings, customTypes);
+  const allLabelTypes = getAllLabelTypes(prefixMappings, customTypes);
 
-  // Show loading state while hydrating
   if (!hasHydrated) {
     return (
-      <div className="flex items-center justify-center p-12">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <div className="text-center space-y-3">
-              <div className="text-lg font-medium">Loading settings…</div>
-              <div className="text-sm text-muted-foreground">
-                Initializing label configuration
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-muted-foreground">Loading settings...</div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 max-w-6xl">
-      {/* Action Bar */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-3">
-            <Button onClick={handleSave} className="gap-2">
-              <Save className="w-4 h-4" />
-              Save Settings
-            </Button>
-            <Button onClick={handleResetToDefaults} variant="outline" className="gap-2">
-              <RotateCcw className="w-4 h-4" />
-              Reset to Defaults
-            </Button>
-            <Button onClick={handleExport} variant="outline" className="gap-2">
-              <Download className="w-4 h-4" />
-              Export
-            </Button>
-            <Button onClick={handleImportClick} variant="outline" className="gap-2">
-              <Upload className="w-4 h-4" />
-              Import
-            </Button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              onChange={handleImportFile}
-              className="hidden"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Preview Card */}
+    <div className="space-y-6 pb-8">
+      {/* Label Preview Section */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Label Preview</CardTitle>
-              <CardDescription>
-                Live preview of your label design (matches printed output exactly)
-              </CardDescription>
+              <CardDescription>Live preview of your label design (matches printed output exactly)</CardDescription>
             </div>
             <Button
               onClick={handleTestPrint}
               disabled={!isConnected || isPrinting}
-              variant="outline"
               className="gap-2"
             >
               <Printer className="w-4 h-4" />
-              {isPrinting ? 'Printing…' : 'Print test label'}
+              {isPrinting ? 'Printing...' : 'Print test label'}
             </Button>
           </div>
         </CardHeader>
@@ -373,10 +374,70 @@ export default function LabelSettingsTab() {
         </CardContent>
       </Card>
 
-      {/* Sound Effects Settings */}
-      <SoundEffectsSettings />
+      {/* Calibration Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Printer Calibration</CardTitle>
+          <CardDescription>
+            Adjust offsets to align the preview with your physical printer output. Use the calibration pattern to identify any shifts.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="calibration-offset-x">Calibration Offset X (mm)</Label>
+              <Input
+                id="calibration-offset-x"
+                type="number"
+                step="0.1"
+                value={calibrationOffsetXmm}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setCalibrationOffsetXmm(isNaN(val) ? 0 : val);
+                }}
+                className="font-mono"
+              />
+              <p className="text-xs text-muted-foreground">
+                Positive values shift right, negative values shift left
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="calibration-offset-y">Calibration Offset Y (mm)</Label>
+              <Input
+                id="calibration-offset-y"
+                type="number"
+                step="0.1"
+                value={calibrationOffsetYmm}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setCalibrationOffsetYmm(isNaN(val) ? 0 : val);
+                }}
+                className="font-mono"
+              />
+              <p className="text-xs text-muted-foreground">
+                Positive values shift down, negative values shift up
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2 pt-2">
+            <Button
+              onClick={handlePrintCalibrationPattern}
+              disabled={!isConnected || isPrintingCalibration}
+              variant="outline"
+              className="gap-2"
+            >
+              <Target className="w-4 h-4" />
+              {isPrintingCalibration ? 'Printing...' : 'Print calibration pattern'}
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Prints a border and crosshair to help identify printer offset
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* Basic Settings */}
+      {/* Label Dimensions */}
       <Card>
         <CardHeader>
           <CardTitle>Label Dimensions</CardTitle>
@@ -391,8 +452,6 @@ export default function LabelSettingsTab() {
                 type="number"
                 value={widthMm}
                 onChange={(e) => setWidthMm(parseInt(e.target.value) || 48)}
-                min={10}
-                max={100}
               />
             </div>
             <div className="space-y-2">
@@ -402,8 +461,6 @@ export default function LabelSettingsTab() {
                 type="number"
                 value={heightMm}
                 onChange={(e) => setHeightMm(parseInt(e.target.value) || 30)}
-                min={10}
-                max={100}
               />
             </div>
           </div>
@@ -413,15 +470,15 @@ export default function LabelSettingsTab() {
       {/* Barcode Settings */}
       <Card>
         <CardHeader>
-          <CardTitle>Barcode Configuration</CardTitle>
-          <CardDescription>Configure barcode format and appearance</CardDescription>
+          <CardTitle>Barcode Settings</CardTitle>
+          <CardDescription>Configure barcode type and dimensions</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="barcodeType">Barcode Type</Label>
+              <Label htmlFor="barcode-type">Barcode Type</Label>
               <Select value={barcodeType} onValueChange={setBarcodeType}>
-                <SelectTrigger id="barcodeType">
+                <SelectTrigger id="barcode-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -429,31 +486,28 @@ export default function LabelSettingsTab() {
                   <SelectItem value="CODE39">CODE39</SelectItem>
                   <SelectItem value="EAN13">EAN13</SelectItem>
                   <SelectItem value="UPCA">UPC-A</SelectItem>
+                  <SelectItem value="QR">QR Code</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="barcodeHeight">Barcode Height (mm)</Label>
+              <Label htmlFor="barcode-height">Barcode Height (mm)</Label>
               <Input
-                id="barcodeHeight"
+                id="barcode-height"
                 type="number"
                 value={barcodeHeight}
                 onChange={(e) => setBarcodeHeight(parseInt(e.target.value) || 8)}
-                min={3}
-                max={20}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="spacing">Element Spacing (mm)</Label>
-              <Input
-                id="spacing"
-                type="number"
-                value={spacing}
-                onChange={(e) => setSpacing(parseInt(e.target.value) || 3)}
-                min={1}
-                max={10}
-              />
-            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="spacing">Spacing Between Elements (mm)</Label>
+            <Input
+              id="spacing"
+              type="number"
+              value={spacing}
+              onChange={(e) => setSpacing(parseInt(e.target.value) || 3)}
+            />
           </div>
         </CardContent>
       </Card>
@@ -461,70 +515,60 @@ export default function LabelSettingsTab() {
       {/* Prefix Mappings */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Prefix Mappings</CardTitle>
-              <CardDescription>Map serial number prefixes to label types</CardDescription>
-            </div>
-            <Button onClick={addPrefixMapping} size="sm" className="gap-2">
-              <Plus className="w-4 h-4" />
-              Add Mapping
-            </Button>
-          </div>
+          <CardTitle>Prefix Mappings</CardTitle>
+          <CardDescription>Map serial number prefixes to label types and titles</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {prefixMappings.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No prefix mappings configured. Click "Add Mapping" to get started.
-            </div>
-          ) : (
-            prefixMappings.map((mapping, index) => (
-              <div key={index} className="flex gap-3 items-end">
-                <div className="flex-1 space-y-2">
-                  <Label>Prefix</Label>
-                  <Input
-                    value={mapping[0]}
-                    onChange={(e) => updatePrefixMapping(index, 'prefix', e.target.value)}
-                    placeholder="e.g., SSV"
-                  />
-                </div>
-                <div className="flex-1 space-y-2">
-                  <Label>Label Type</Label>
-                  <Select
-                    value={mapping[1].labelType}
-                    onValueChange={(value) => updatePrefixMapping(index, 'labelType', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allLabelTypeInfos.map((info) => (
-                        <SelectItem key={info.value} value={info.value}>
-                          {info.displayName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex-1 space-y-2">
-                  <Label>Title</Label>
-                  <Input
-                    value={mapping[1].title}
-                    onChange={(e) => updatePrefixMapping(index, 'title', e.target.value)}
-                    placeholder="e.g., Dual Band"
-                  />
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => removePrefixMapping(index)}
-                  className="flex-shrink-0"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+          {prefixMappings.map(([prefix, mapping], index) => (
+            <div key={index} className="flex gap-2 items-end">
+              <div className="flex-1 space-y-2">
+                <Label>Prefix</Label>
+                <Input
+                  value={prefix}
+                  onChange={(e) => updatePrefixMapping(index, 'prefix', e.target.value)}
+                  placeholder="e.g., SSV"
+                />
               </div>
-            ))
-          )}
+              <div className="flex-1 space-y-2">
+                <Label>Label Type</Label>
+                <Select
+                  value={mapping.labelType}
+                  onValueChange={(value) => updatePrefixMapping(index, 'labelType', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allLabelTypes.map((typeInfo) => (
+                      <SelectItem key={typeInfo.value} value={typeInfo.value}>
+                        {typeInfo.displayName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex-1 space-y-2">
+                <Label>Title</Label>
+                <Input
+                  value={mapping.title}
+                  onChange={(e) => updatePrefixMapping(index, 'title', e.target.value)}
+                  placeholder="e.g., Dual Band"
+                />
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => removePrefixMapping(index)}
+                className="flex-shrink-0"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          ))}
+          <Button onClick={addPrefixMapping} variant="outline" className="w-full gap-2">
+            <Plus className="w-4 h-4" />
+            Add Prefix Mapping
+          </Button>
         </CardContent>
       </Card>
 
@@ -532,12 +576,10 @@ export default function LabelSettingsTab() {
       <Card>
         <CardHeader>
           <CardTitle>Custom Label Types</CardTitle>
-          <CardDescription>
-            Add custom label types beyond the built-in options (Dual Band, Tri Band, New Dual Band)
-          </CardDescription>
+          <CardDescription>Add custom label types for your prefix mappings</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             <Input
               value={newCustomType}
               onChange={(e) => setNewCustomType(e.target.value)}
@@ -551,7 +593,7 @@ export default function LabelSettingsTab() {
             />
             <Button onClick={addCustomType} className="gap-2">
               <Plus className="w-4 h-4" />
-              Add Type
+              Add
             </Button>
           </div>
           {customTypes.length > 0 && (
@@ -572,12 +614,12 @@ export default function LabelSettingsTab() {
         </CardContent>
       </Card>
 
-      {/* Advanced Layout Settings */}
+      {/* Layout Settings */}
       <Card>
         <CardHeader>
           <CardTitle>Advanced Layout Settings</CardTitle>
           <CardDescription>
-            Fine-tune the position and size of each label element (in millimeters)
+            Fine-tune the position and size of each element. X acts as left padding for barcodes.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -586,31 +628,29 @@ export default function LabelSettingsTab() {
             <h4 className="font-medium">Title</h4>
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-2">
-                <Label>X Position (mm)</Label>
+                <Label className="text-xs">X (mm)</Label>
                 <Input
                   type="number"
+                  step="0.1"
                   value={Number(titleLayout.x)}
                   onChange={(e) => updateLayoutField(titleLayout, setTitleLayout, 'x', e.target.value)}
-                  step="0.1"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Y Position (mm)</Label>
+                <Label className="text-xs">Y (mm)</Label>
                 <Input
                   type="number"
+                  step="0.1"
                   value={Number(titleLayout.y)}
                   onChange={(e) => updateLayoutField(titleLayout, setTitleLayout, 'y', e.target.value)}
-                  step="0.1"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Font Size</Label>
+                <Label className="text-xs">Font Size</Label>
                 <Input
                   type="number"
                   value={Number(titleLayout.fontSize)}
                   onChange={(e) => updateLayoutField(titleLayout, setTitleLayout, 'fontSize', e.target.value)}
-                  min={6}
-                  max={24}
                 />
               </div>
             </div>
@@ -621,78 +661,65 @@ export default function LabelSettingsTab() {
           {/* Barcode 1 Layout */}
           <div className="space-y-3">
             <h4 className="font-medium">Barcode 1</h4>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div className="space-y-2">
-                <Label>X Position (mm)</Label>
+                <Label className="text-xs">X (mm)</Label>
                 <Input
                   type="number"
+                  step="0.1"
                   value={Number(barcode1Layout.x)}
                   onChange={(e) => updateLayoutField(barcode1Layout, setBarcode1Layout, 'x', e.target.value)}
-                  step="0.1"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Y Position (mm)</Label>
+                <Label className="text-xs">Y (mm)</Label>
                 <Input
                   type="number"
+                  step="0.1"
                   value={Number(barcode1Layout.y)}
                   onChange={(e) => updateLayoutField(barcode1Layout, setBarcode1Layout, 'y', e.target.value)}
-                  step="0.1"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Width (mm)</Label>
+                <Label className="text-xs">Height (mm)</Label>
                 <Input
                   type="number"
-                  value={Number(barcode1Layout.width)}
-                  onChange={(e) => updateLayoutField(barcode1Layout, setBarcode1Layout, 'width', e.target.value)}
                   step="0.1"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Height (mm)</Label>
-                <Input
-                  type="number"
                   value={Number(barcode1Layout.height)}
                   onChange={(e) => updateLayoutField(barcode1Layout, setBarcode1Layout, 'height', e.target.value)}
-                  step="0.1"
                 />
               </div>
             </div>
           </div>
-
-          <Separator />
 
           {/* Serial Text 1 Layout */}
           <div className="space-y-3">
             <h4 className="font-medium">Serial Text 1</h4>
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-2">
-                <Label>X Position (mm)</Label>
+                <Label className="text-xs">X (mm)</Label>
                 <Input
                   type="number"
+                  step="0.1"
                   value={Number(serialText1Layout.x)}
                   onChange={(e) => updateLayoutField(serialText1Layout, setSerialText1Layout, 'x', e.target.value)}
-                  step="0.1"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Y Position (mm)</Label>
+                <Label className="text-xs">Y (mm)</Label>
                 <Input
                   type="number"
+                  step="0.1"
                   value={Number(serialText1Layout.y)}
                   onChange={(e) => updateLayoutField(serialText1Layout, setSerialText1Layout, 'y', e.target.value)}
-                  step="0.1"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Font Size</Label>
+                <Label className="text-xs">Font Size</Label>
                 <Input
                   type="number"
                   value={Number(serialText1Layout.fontSize)}
                   onChange={(e) => updateLayoutField(serialText1Layout, setSerialText1Layout, 'fontSize', e.target.value)}
-                  min={6}
-                  max={24}
                 />
               </div>
             </div>
@@ -703,82 +730,107 @@ export default function LabelSettingsTab() {
           {/* Barcode 2 Layout */}
           <div className="space-y-3">
             <h4 className="font-medium">Barcode 2</h4>
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div className="space-y-2">
-                <Label>X Position (mm)</Label>
+                <Label className="text-xs">X (mm)</Label>
                 <Input
                   type="number"
+                  step="0.1"
                   value={Number(barcode2Layout.x)}
                   onChange={(e) => updateLayoutField(barcode2Layout, setBarcode2Layout, 'x', e.target.value)}
-                  step="0.1"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Y Position (mm)</Label>
+                <Label className="text-xs">Y (mm)</Label>
                 <Input
                   type="number"
+                  step="0.1"
                   value={Number(barcode2Layout.y)}
                   onChange={(e) => updateLayoutField(barcode2Layout, setBarcode2Layout, 'y', e.target.value)}
-                  step="0.1"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Width (mm)</Label>
+                <Label className="text-xs">Height (mm)</Label>
                 <Input
                   type="number"
-                  value={Number(barcode2Layout.width)}
-                  onChange={(e) => updateLayoutField(barcode2Layout, setBarcode2Layout, 'width', e.target.value)}
                   step="0.1"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Height (mm)</Label>
-                <Input
-                  type="number"
                   value={Number(barcode2Layout.height)}
                   onChange={(e) => updateLayoutField(barcode2Layout, setBarcode2Layout, 'height', e.target.value)}
-                  step="0.1"
                 />
               </div>
             </div>
           </div>
-
-          <Separator />
 
           {/* Serial Text 2 Layout */}
           <div className="space-y-3">
             <h4 className="font-medium">Serial Text 2</h4>
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-2">
-                <Label>X Position (mm)</Label>
+                <Label className="text-xs">X (mm)</Label>
                 <Input
                   type="number"
+                  step="0.1"
                   value={Number(serialText2Layout.x)}
                   onChange={(e) => updateLayoutField(serialText2Layout, setSerialText2Layout, 'x', e.target.value)}
-                  step="0.1"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Y Position (mm)</Label>
+                <Label className="text-xs">Y (mm)</Label>
                 <Input
                   type="number"
+                  step="0.1"
                   value={Number(serialText2Layout.y)}
                   onChange={(e) => updateLayoutField(serialText2Layout, setSerialText2Layout, 'y', e.target.value)}
-                  step="0.1"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Font Size</Label>
+                <Label className="text-xs">Font Size</Label>
                 <Input
                   type="number"
                   value={Number(serialText2Layout.fontSize)}
                   onChange={(e) => updateLayoutField(serialText2Layout, setSerialText2Layout, 'fontSize', e.target.value)}
-                  min={6}
-                  max={24}
                 />
               </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Sound Effects */}
+      <SoundEffectsSettings />
+
+      {/* Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Settings Management</CardTitle>
+          <CardDescription>Save, export, import, or reset your label settings</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={handleSave} className="gap-2">
+              <Save className="w-4 h-4" />
+              Save Settings
+            </Button>
+            <Button onClick={handleExport} variant="outline" className="gap-2">
+              <Download className="w-4 h-4" />
+              Export Settings
+            </Button>
+            <Button onClick={handleImportClick} variant="outline" className="gap-2">
+              <Upload className="w-4 h-4" />
+              Import Settings
+            </Button>
+            <Button onClick={handleResetToDefaults} variant="outline" className="gap-2">
+              <RotateCcw className="w-4 h-4" />
+              Reset to Defaults
+            </Button>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleImportFile}
+            className="hidden"
+          />
         </CardContent>
       </Card>
     </div>

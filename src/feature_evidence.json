@@ -2,10 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-in-the-label-settings-tab-add-a-user-visible-action-next-to-the-label-preview-that-prints-a-test-label-matching-the-current-preview-including-the-current-sample-serial-inputs-and-the-preview-title-use-english-for-the-button-label-and-any-related-ui-text-e-g-print-test-label",
-      "featureTitle": "In the Label Settings tab, add a user-visible action next to the Label Preview that prints a test label matching the current preview (including the current sample serial inputs and the preview title). Use English for the button label and any related UI text (e.g., \"Print test label\").",
+      "featureId": "feature-adjust-cpcl-barcode-generation-parameters-in-cpclgenerator-ts-to-ensure-barcodes-fit-completely-within-the-label-boundaries-when-printed-using-cpcl-protocol",
+      "featureTitle": "Adjust CPCL barcode generation parameters in cpclGenerator.ts to ensure barcodes fit completely within the label boundaries when printed using CPCL protocol",
       "files": [
-        "frontend/src/tabs/LabelSettingsTab.tsx"
+        "frontend/src/printing/cpclLayoutAdjustments.ts"
       ],
       "components": [
         "authorization@4.0.0",
@@ -21,11 +21,11 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-refactor-the-label-preview-component-so-the-parent-labelsettingstab-can-access-the-exact-preview-data-currently-being-displayed-at-minimum-sample-serial-1-sample-serial-2-and-the-computed-preview-title-so-the-new-print-test-label-action-can-print-exactly-what-is-shown",
-      "featureTitle": "Refactor the Label Preview component so the parent (LabelSettingsTab) can access the exact preview data currently being displayed (at minimum: sample serial 1, sample serial 2, and the computed preview title), so the new \"Print test label\" action can print exactly what is shown.",
+      "featureId": "feature-calibrate-barcode-positioning-calculations-in-cpcllayoutadjustments-ts-to-account-for-cpcl-printer-coordinate-system-and-ensure-printout-matches-the-preview-shown-in-the-uploaded-photo",
+      "featureTitle": "Calibrate barcode positioning calculations in cpclLayoutAdjustments.ts to account for CPCL printer coordinate system and ensure printout matches the preview shown in the uploaded photo",
       "files": [
         "frontend/src/printing/LabelPreview.tsx",
-        "frontend/src/tabs/LabelSettingsTab.tsx"
+        "frontend/src/printing/cpclLayoutAdjustments.ts"
       ],
       "components": [
         "authorization@4.0.0",
@@ -41,11 +41,10 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-add-adjust-cpcl-generation-support-so-printing-from-the-label-settings-preview-does-not-depend-on-prefix-mappings-to-determine-the-printed-title-it-must-be-able-to-print-with-an-explicit-title-matching-the-preview-title",
-      "featureTitle": "Add/adjust CPCL generation support so printing from the Label Settings preview does not depend on prefix mappings to determine the printed title; it must be able to print with an explicit title matching the preview title.",
+      "featureId": "feature-review-and-adjust-barcode-width-estimation-logic-for-code128-barcodes-in-cpcllayoutadjustments-ts-to-accurately-calculate-barcode-dimensions-for-cpcl-protocol-output",
+      "featureTitle": "Review and adjust barcode width estimation logic for CODE128 barcodes in cpclLayoutAdjustments.ts to accurately calculate barcode dimensions for CPCL protocol output",
       "files": [
-        "frontend/src/printing/cpclGenerator.ts",
-        "frontend/src/tabs/LabelSettingsTab.tsx"
+        "frontend/src/printing/cpclLayoutAdjustments.ts"
       ],
       "components": [
         "authorization@4.0.0",
@@ -57,6 +56,25 @@
       ],
       "testIds": [
         "REQ-3"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-update-labelpreview-tsx-to-accurately-represent-cpcl-printer-output-so-the-preview-matches-actual-printed-results-with-correct-scaling-and-positioning",
+      "featureTitle": "Update LabelPreview.tsx to accurately represent CPCL printer output so the preview matches actual printed results with correct scaling and positioning",
+      "files": [
+        "frontend/src/printing/LabelPreview.tsx"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-4"
       ],
       "confidence": "high"
     }

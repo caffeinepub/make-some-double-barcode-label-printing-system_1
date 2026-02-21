@@ -1,85 +1,99 @@
 {
   "kind": "build_request",
-  "title": "Add 'Print test label' button in Label Settings preview to print exactly what is shown",
-  "priority": "normal",
+  "title": "Fix barcode alignment to match preview in CPCL printouts",
+  "projectName": "Label Printer",
+  "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "In the Label Settings tab, add a user-visible action next to the Label Preview that prints a test label matching the current preview (including the current sample serial inputs and the preview title). Use English for the button label and any related UI text (e.g., \"Print test label\").",
+      "text": "Adjust CPCL barcode generation parameters in cpclGenerator.ts to ensure barcodes fit completely within the label boundaries when printed using CPCL protocol",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-1"
+          "msg-latest"
         ],
         "quotes": [
-          "I label setting next to label preview add option to print test label whatever showing on preview so when I adjust the settings i can do test print."
+          "Why my label print out doesn't look like preview? Barcode still is not fully on label.",
+          "remember label is printed out using cpcl protocol"
         ]
       },
       "acceptanceCriteria": [
-        "Label Settings > Label Preview area contains a \"Print test label\" action placed adjacent to the preview (e.g., in the preview card header/actions).",
-        "Clicking \"Print test label\" sends a print job to the currently connected printer using the current in-tab label settings and the exact values currently shown in the preview (sample serial 1, sample serial 2, and the title displayed in the preview).",
-        "If no printer is connected, clicking the action does not crash and instead shows a clear error toast (English) explaining that a printer must be connected (and that the user can connect it in the Devices tab).",
-        "While the test label is being sent, the UI indicates progress (e.g., disables the button and shows a \"Printing…\" label) and re-enables after completion/failure."
+        "Barcodes are fully visible on printed labels without any clipping at edges",
+        "Both upper and lower barcodes fit completely within the label boundaries"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Refactor the Label Preview component so the parent (LabelSettingsTab) can access the exact preview data currently being displayed (at minimum: sample serial 1, sample serial 2, and the computed preview title), so the new \"Print test label\" action can print exactly what is shown.",
+      "text": "Calibrate barcode positioning calculations in cpclLayoutAdjustments.ts to account for CPCL printer coordinate system and ensure printout matches the preview shown in the uploaded photo",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-1"
+          "msg-latest"
         ],
         "quotes": [
-          "print test label whatever showing on preview"
+          "Adjust to make print out exactly how is on preview showed on photo",
+          "Make that finally work"
         ]
       },
       "acceptanceCriteria": [
-        "LabelPreview no longer keeps the preview-critical values exclusively internal; LabelSettingsTab can read the current sample serial values and the title shown in the preview at the moment the user clicks \"Print test label\".",
-        "Changing sample serial inputs in the preview updates the values used for \"Print test label\" without requiring a page refresh.",
-        "The preview rendering behavior remains unchanged (zoom controls, layout, and sample serial inputs still work)."
+        "Printed label layout matches the preview display pixel-for-pixel",
+        "Barcode horizontal positioning on printout matches preview positioning",
+        "Text and barcode vertical spacing matches preview"
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Add/adjust CPCL generation support so printing from the Label Settings preview does not depend on prefix mappings to determine the printed title; it must be able to print with an explicit title matching the preview title.",
+      "text": "Review and adjust barcode width estimation logic for CODE128 barcodes in cpclLayoutAdjustments.ts to accurately calculate barcode dimensions for CPCL protocol output",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-1"
+          "msg-latest"
         ],
         "quotes": [
-          "whatever showing on preview"
+          "Barcode still is not fully on label",
+          "Adjust settings"
         ]
       },
       "acceptanceCriteria": [
-        "The CPCL used by \"Print test label\" uses the same layout settings as the preview and includes the same title text shown in the preview, even when prefix mappings are empty or do not match a prefix.",
-        "The implementation does not break existing print flows that use the current CPCL generator (e.g., Scan & Print, Devices tab test print)."
+        "Barcode width calculations accurately reflect actual printed dimensions",
+        "Center alignment calculations use correct barcode width values",
+        "No barcode overflow beyond label edges"
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "text": "Update LabelPreview.tsx to accurately represent CPCL printer output so the preview matches actual printed results with correct scaling and positioning",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-latest"
+        ],
+        "quotes": [
+          "Why my label print out doesn't look like preview?",
+          "make print out exactly how is on preview"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Preview display accurately represents what will be printed via CPCL",
+        "Barcode dimensions in preview match printed barcode dimensions",
+        "Element positioning in preview matches physical printout positions"
       ]
     }
   ],
   "constraints": [
-    "Do not modify any files under frontend/src/components/ui (Shadcn components are read-only).",
-    "Do not modify files listed in frontend.immutablePaths in SYSTEM_CONTEXT.",
-    "Keep backend architecture unchanged (single Motoko actor); this feature should be implemented entirely on the frontend unless a backend change is strictly required."
+    "All changes must maintain CPCL protocol compatibility",
+    "Do not modify the backend/main.mo file",
+    "Do not alter the USB printer communication layer in usbCpclTransport.ts",
+    "Preserve existing calibration offset functionality"
   ],
   "nonGoals": [
-    "Do not add new printer connection methods (Bluetooth, network, etc.).",
-    "Do not change the Scan & Print workflow or backend print-job submission behavior.",
-    "Do not redesign the overall Label Settings page beyond adding the requested test-print option near the preview."
+    "Changing the barcode symbology type",
+    "Adding new label types or templates",
+    "Modifying the scanning workflow",
+    "Altering printer connection logic"
   ],
   "imageRequirements": {
     "required": [],
     "edits": []
-  },
-  "userProfileUpdate": {
-    "goalsToAdd": [],
-    "goalsToRemove": [],
-    "preferencesToAdd": [],
-    "preferencesToRemove": [],
-    "miscToAdd": [],
-    "miscToRemove": [],
-    "fieldsToSet": {},
-    "fieldsToDelete": []
   }
 }
