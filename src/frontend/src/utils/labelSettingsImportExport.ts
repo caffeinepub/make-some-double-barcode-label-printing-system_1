@@ -1,4 +1,4 @@
-import type { LabelSettings as BackendLabelSettings, LayoutSettings } from '../backend';
+import type { LabelSettings as BackendLabelSettings, LayoutSettings, BarcodePosition } from '../backend';
 import type { ExtendedLabelSettings } from '../state/labelSettingsStore';
 import { validateBarcodeSettings } from './barcodeSettingsValidation';
 
@@ -18,7 +18,7 @@ export function exportLabelSettings(settings: BackendLabelSettings | ExtendedLab
 /**
  * Create default layout settings
  */
-function createDefaultLayout(x: number, y: number, width: number, height: number, fontSize: number): LayoutSettings {
+function createDefaultLayout(x: number, y: number, width: number, height: number, fontSize: number, verticalSpacing: number = 0): LayoutSettings {
   return {
     x: BigInt(x),
     y: BigInt(y),
@@ -26,6 +26,18 @@ function createDefaultLayout(x: number, y: number, width: number, height: number
     width: BigInt(width),
     height: BigInt(height),
     fontSize: BigInt(fontSize),
+    verticalSpacing: BigInt(verticalSpacing),
+  };
+}
+
+/**
+ * Create default barcode position
+ */
+function createDefaultBarcodePosition(x: number, y: number, verticalSpacing: number): BarcodePosition {
+  return {
+    x: BigInt(x),
+    y: BigInt(y),
+    verticalSpacing: BigInt(verticalSpacing),
   };
 }
 
@@ -33,10 +45,14 @@ function createDefaultLayout(x: number, y: number, width: number, height: number
  * Migrate old settings structure to new layout-based structure
  */
 function migrateOldSettings(parsed: any): ExtendedLabelSettings {
-  // If already has new structure, return as-is with calibration offsets
+  // If already has new structure, ensure all required fields exist
   if (parsed.titleLayout && parsed.barcode1Layout) {
     return {
       ...parsed,
+      barcode1Position: parsed.barcode1Position || createDefaultBarcodePosition(2, 2, 1),
+      barcode2Position: parsed.barcode2Position || createDefaultBarcodePosition(2, 14, 1),
+      globalHorizontalOffset: parsed.globalHorizontalOffset !== undefined ? parsed.globalHorizontalOffset : BigInt(0),
+      globalVerticalOffset: parsed.globalVerticalOffset !== undefined ? parsed.globalVerticalOffset : BigInt(0),
       calibrationOffsetXmm: parsed.calibrationOffsetXmm ?? 0,
       calibrationOffsetYmm: parsed.calibrationOffsetYmm ?? 0,
     } as ExtendedLabelSettings;
@@ -64,11 +80,15 @@ function migrateOldSettings(parsed: any): ExtendedLabelSettings {
     barcodeHeight: BigInt(barcodeHeight),
     spacing: BigInt(spacing),
     prefixMappings: parsed.prefixMappings || [],
-    titleLayout: createDefaultLayout(2, titleY, widthMm - 4, 4, fontSize),
-    barcode1Layout: createDefaultLayout(2, barcode1Y, widthMm - 4, barcodeHeight, 10),
-    serialText1Layout: createDefaultLayout(2, serial1Y, widthMm - 4, 3, 8),
-    barcode2Layout: createDefaultLayout(2, barcode2Y, widthMm - 4, barcodeHeight, 10),
-    serialText2Layout: createDefaultLayout(2, serial2Y, widthMm - 4, 3, 8),
+    titleLayout: createDefaultLayout(2, titleY, widthMm - 4, 4, fontSize, 0),
+    barcode1Layout: createDefaultLayout(2, barcode1Y, widthMm - 4, barcodeHeight, 10, 0),
+    serialText1Layout: createDefaultLayout(2, serial1Y, widthMm - 4, 3, 8, 0),
+    barcode2Layout: createDefaultLayout(2, barcode2Y, widthMm - 4, barcodeHeight, 10, 0),
+    serialText2Layout: createDefaultLayout(2, serial2Y, widthMm - 4, 3, 8, 0),
+    barcode1Position: createDefaultBarcodePosition(2, barcode1Y, 1),
+    barcode2Position: createDefaultBarcodePosition(2, barcode2Y, 1),
+    globalHorizontalOffset: BigInt(0),
+    globalVerticalOffset: BigInt(0),
     calibrationOffsetXmm: 0,
     calibrationOffsetYmm: 0,
   };
@@ -184,6 +204,7 @@ export function importLabelSettings(jsonString: string): ExtendedLabelSettings {
     if (typeof layout.fontSize !== 'bigint') {
       throw new Error(`Invalid ${layoutField}.fontSize (expected number)`);
     }
+    // verticalSpacing is optional for backward compatibility
   }
   
   // Step 4: Validate prefix mappings structure
@@ -213,9 +234,13 @@ export function importLabelSettings(jsonString: string): ExtendedLabelSettings {
     }
   }
 
-  // Step 5: Ensure calibration offsets exist (default to 0 if missing)
+  // Step 5: Ensure all required fields exist with defaults
   const settings: ExtendedLabelSettings = {
     ...parsed,
+    barcode1Position: parsed.barcode1Position || createDefaultBarcodePosition(2, 2, 1),
+    barcode2Position: parsed.barcode2Position || createDefaultBarcodePosition(2, 14, 1),
+    globalHorizontalOffset: parsed.globalHorizontalOffset !== undefined ? parsed.globalHorizontalOffset : BigInt(0),
+    globalVerticalOffset: parsed.globalVerticalOffset !== undefined ? parsed.globalVerticalOffset : BigInt(0),
     calibrationOffsetXmm: typeof parsed.calibrationOffsetXmm === 'number' ? parsed.calibrationOffsetXmm : 0,
     calibrationOffsetYmm: typeof parsed.calibrationOffsetYmm === 'number' ? parsed.calibrationOffsetYmm : 0,
   };

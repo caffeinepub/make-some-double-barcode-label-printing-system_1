@@ -151,17 +151,19 @@ export function generateCalibrationPatternCPCL(widthMm: number, heightMm: number
 }
 
 /**
- * Apply calibration offsets to a position (mm)
+ * Apply global and calibration offsets to a position (mm)
  */
-function applyCalibrationOffset(
+function applyAllOffsets(
   xMm: number,
   yMm: number,
-  offsetXmm: number,
-  offsetYmm: number
+  globalHorizontalOffset: number,
+  globalVerticalOffset: number,
+  calibrationOffsetXmm: number,
+  calibrationOffsetYmm: number
 ): { x: number; y: number } {
   return {
-    x: xMm + offsetXmm,
-    y: yMm + offsetYmm,
+    x: xMm + globalHorizontalOffset + calibrationOffsetXmm,
+    y: yMm + globalVerticalOffset + calibrationOffsetYmm,
   };
 }
 
@@ -185,10 +187,12 @@ export function generateCPCL(
   const widthDots = mmToDots(widthMm);
   const heightDots = mmToDots(heightMm);
 
-  // Get calibration offsets (default to 0 if not present)
+  // Get all offsets
   const extendedSettings = settings as ExtendedLabelSettings;
-  const offsetXmm = extendedSettings.calibrationOffsetXmm ?? 0;
-  const offsetYmm = extendedSettings.calibrationOffsetYmm ?? 0;
+  const globalHorizontalOffset = Number(settings.globalHorizontalOffset || 0);
+  const globalVerticalOffset = Number(settings.globalVerticalOffset || 0);
+  const calibrationOffsetXmm = extendedSettings.calibrationOffsetXmm ?? 0;
+  const calibrationOffsetYmm = extendedSettings.calibrationOffsetYmm ?? 0;
 
   // Get barcode mapping with fallback
   const uiType = settings.barcodeType;
@@ -207,9 +211,11 @@ export function generateCPCL(
   // Extract layout settings
   const titleLayout = settings.titleLayout;
   const barcode1Layout = settings.barcode1Layout;
-  const serial1Layout = settings.serialText1Layout;
   const barcode2Layout = settings.barcode2Layout;
-  const serial2Layout = settings.serialText2Layout;
+  
+  // Extract barcode positions (these control actual placement)
+  const barcode1Position = settings.barcode1Position;
+  const barcode2Position = settings.barcode2Position;
 
   // Validate barcode data
   validateBarcodeData(leftSerial, uiType, 1);
@@ -224,12 +230,14 @@ export function generateCPCL(
   lines.push('! 0 200 200 ' + heightDots + ' 1');
   lines.push('PAGE-WIDTH ' + widthDots);
 
-  // Title - apply calibration offset
-  const titlePos = applyCalibrationOffset(
+  // Title - apply all offsets
+  const titlePos = applyAllOffsets(
     Number(titleLayout.x),
     Number(titleLayout.y),
-    offsetXmm,
-    offsetYmm
+    globalHorizontalOffset,
+    globalVerticalOffset,
+    calibrationOffsetXmm,
+    calibrationOffsetYmm
   );
   const titleX = mmToDots(titlePos.x);
   const titleY = mmToDots(titlePos.y);
@@ -239,20 +247,22 @@ export function generateCPCL(
   lines.push(`TEXT 4 0 ${titleX} ${titleY} ${title}`);
   lines.push(`SETMAG 1 1`);
 
-  // Barcode 1 - with left-aligned clamp adjustment and calibration offset
+  // Barcode 1 - use barcode1Position for placement
   const barcode1HeightMm = Number(barcode1Layout.height);
   const barcode1Scale = barcode1Layout.scale;
   const barcode1Height = calculateBarcodeHeight(barcode1HeightMm, barcode1Scale, 'Barcode 1', 1);
 
-  // Apply calibration offset to barcode 1 position
-  const barcode1Pos = applyCalibrationOffset(
-    Number(barcode1Layout.x),
-    Number(barcode1Layout.y),
-    offsetXmm,
-    offsetYmm
+  // Apply all offsets to barcode 1 position
+  const barcode1Pos = applyAllOffsets(
+    Number(barcode1Position.x),
+    Number(barcode1Position.y),
+    globalHorizontalOffset,
+    globalVerticalOffset,
+    calibrationOffsetXmm,
+    calibrationOffsetYmm
   );
 
-  // Estimate barcode width and calculate left-aligned X with clamp (using offset-adjusted X)
+  // Estimate barcode width and calculate left-aligned X with clamp
   const barcode1WidthEstimate = estimateBarcodeWidthDots(leftSerial.length, barcodeWidth, barcodeRatio);
   const barcode1RequestedX = mmToDots(barcode1Pos.x);
   const barcode1Adjustment = calculateLeftAlignedBarcodeX(
@@ -285,35 +295,40 @@ export function generateCPCL(
     wasFallback
   );
 
-  // Serial Text 1 - apply calibration offset
-  const serial1Pos = applyCalibrationOffset(
-    Number(serial1Layout.x),
-    Number(serial1Layout.y),
-    offsetXmm,
-    offsetYmm
+  // Serial Text 1 - positioned below barcode 1 using verticalSpacing
+  const serial1Pos = applyAllOffsets(
+    Number(barcode1Position.x),
+    Number(barcode1Position.y) + barcode1HeightMm + Number(barcode1Position.verticalSpacing),
+    globalHorizontalOffset,
+    globalVerticalOffset,
+    calibrationOffsetXmm,
+    calibrationOffsetYmm
   );
   const serial1X = mmToDots(serial1Pos.x);
   const serial1Y = mmToDots(serial1Pos.y);
-  const serial1ScaleX = clampScale(serial1Layout.scale, 'Serial Text 1 X');
-  const serial1ScaleY = clampScale(serial1Layout.scale, 'Serial Text 1 Y');
+  const serial1Scale = barcode1Layout.scale;
+  const serial1ScaleX = clampScale(serial1Scale, 'Serial Text 1 X');
+  const serial1ScaleY = clampScale(serial1Scale, 'Serial Text 1 Y');
   lines.push(`SETMAG ${serial1ScaleX} ${serial1ScaleY}`);
   lines.push(`TEXT 7 0 ${serial1X} ${serial1Y} ${leftSerial}`);
   lines.push(`SETMAG 1 1`);
 
-  // Barcode 2 - with left-aligned clamp adjustment and calibration offset
+  // Barcode 2 - use barcode2Position for placement
   const barcode2HeightMm = Number(barcode2Layout.height);
   const barcode2Scale = barcode2Layout.scale;
   const barcode2Height = calculateBarcodeHeight(barcode2HeightMm, barcode2Scale, 'Barcode 2', 2);
 
-  // Apply calibration offset to barcode 2 position
-  const barcode2Pos = applyCalibrationOffset(
-    Number(barcode2Layout.x),
-    Number(barcode2Layout.y),
-    offsetXmm,
-    offsetYmm
+  // Apply all offsets to barcode 2 position
+  const barcode2Pos = applyAllOffsets(
+    Number(barcode2Position.x),
+    Number(barcode2Position.y),
+    globalHorizontalOffset,
+    globalVerticalOffset,
+    calibrationOffsetXmm,
+    calibrationOffsetYmm
   );
 
-  // Estimate barcode width and calculate left-aligned X with clamp (using offset-adjusted X)
+  // Estimate barcode width and calculate left-aligned X with clamp
   const barcode2WidthEstimate = estimateBarcodeWidthDots(rightSerial.length, barcodeWidth, barcodeRatio);
   const barcode2RequestedX = mmToDots(barcode2Pos.x);
   const barcode2Adjustment = calculateLeftAlignedBarcodeX(
@@ -346,17 +361,20 @@ export function generateCPCL(
     wasFallback
   );
 
-  // Serial Text 2 - apply calibration offset
-  const serial2Pos = applyCalibrationOffset(
-    Number(serial2Layout.x),
-    Number(serial2Layout.y),
-    offsetXmm,
-    offsetYmm
+  // Serial Text 2 - positioned below barcode 2 using verticalSpacing
+  const serial2Pos = applyAllOffsets(
+    Number(barcode2Position.x),
+    Number(barcode2Position.y) + barcode2HeightMm + Number(barcode2Position.verticalSpacing),
+    globalHorizontalOffset,
+    globalVerticalOffset,
+    calibrationOffsetXmm,
+    calibrationOffsetYmm
   );
   const serial2X = mmToDots(serial2Pos.x);
   const serial2Y = mmToDots(serial2Pos.y);
-  const serial2ScaleX = clampScale(serial2Layout.scale, 'Serial Text 2 X');
-  const serial2ScaleY = clampScale(serial2Layout.scale, 'Serial Text 2 Y');
+  const serial2Scale = barcode2Layout.scale;
+  const serial2ScaleX = clampScale(serial2Scale, 'Serial Text 2 X');
+  const serial2ScaleY = clampScale(serial2Scale, 'Serial Text 2 Y');
   lines.push(`SETMAG ${serial2ScaleX} ${serial2ScaleY}`);
   lines.push(`TEXT 7 0 ${serial2X} ${serial2Y} ${rightSerial}`);
   lines.push(`SETMAG 1 1`);
@@ -367,14 +385,13 @@ export function generateCPCL(
 }
 
 /**
- * Generate CPCL commands with an explicit title (for preview test printing)
- * This bypasses prefix mapping lookup and uses the provided title directly
+ * Generate CPCL with custom title (for test prints)
  */
 export function generateCPCLWithTitle(
   settings: BackendLabelSettings | ExtendedLabelSettings,
   leftSerial: string,
   rightSerial: string,
-  title: string
+  customTitle: string
 ): string {
   // Convert bigint to number and mm to dots
   const widthMm = Number(settings.widthMm);
@@ -383,35 +400,25 @@ export function generateCPCLWithTitle(
   const widthDots = mmToDots(widthMm);
   const heightDots = mmToDots(heightMm);
 
-  // Get calibration offsets (default to 0 if not present)
+  // Get all offsets
   const extendedSettings = settings as ExtendedLabelSettings;
-  const offsetXmm = extendedSettings.calibrationOffsetXmm ?? 0;
-  const offsetYmm = extendedSettings.calibrationOffsetYmm ?? 0;
+  const globalHorizontalOffset = Number(settings.globalHorizontalOffset || 0);
+  const globalVerticalOffset = Number(settings.globalVerticalOffset || 0);
+  const calibrationOffsetXmm = extendedSettings.calibrationOffsetXmm ?? 0;
+  const calibrationOffsetYmm = extendedSettings.calibrationOffsetYmm ?? 0;
 
   // Get barcode mapping with fallback
   const uiType = settings.barcodeType;
   const barcodeMapping = getBarcodeMapping(uiType);
-  const wasFallback = !isBarcodeTypeSupported(uiType);
-
-  if (wasFallback) {
-    addLog('warn', `Barcode type "${uiType}" not supported, using fallback: ${barcodeMapping.cpclToken}`, {
-      category: 'barcode',
-      reasonCode: 'UNSUPPORTED_TYPE',
-      requestedType: uiType,
-      fallbackType: barcodeMapping.cpclToken,
-    });
-  }
 
   // Extract layout settings
   const titleLayout = settings.titleLayout;
   const barcode1Layout = settings.barcode1Layout;
-  const serial1Layout = settings.serialText1Layout;
   const barcode2Layout = settings.barcode2Layout;
-  const serial2Layout = settings.serialText2Layout;
-
-  // Validate barcode data
-  validateBarcodeData(leftSerial, uiType, 1);
-  validateBarcodeData(rightSerial, uiType, 2);
+  
+  // Extract barcode positions
+  const barcode1Position = settings.barcode1Position;
+  const barcode2Position = settings.barcode2Position;
 
   // Use recommended width and ratio from mapping
   const barcodeWidth = barcodeMapping.recommendedWidth;
@@ -422,35 +429,37 @@ export function generateCPCLWithTitle(
   lines.push('! 0 200 200 ' + heightDots + ' 1');
   lines.push('PAGE-WIDTH ' + widthDots);
 
-  // Title (using explicit title parameter) - apply calibration offset
-  const titlePos = applyCalibrationOffset(
+  // Title - apply all offsets
+  const titlePos = applyAllOffsets(
     Number(titleLayout.x),
     Number(titleLayout.y),
-    offsetXmm,
-    offsetYmm
+    globalHorizontalOffset,
+    globalVerticalOffset,
+    calibrationOffsetXmm,
+    calibrationOffsetYmm
   );
   const titleX = mmToDots(titlePos.x);
   const titleY = mmToDots(titlePos.y);
   const titleScaleX = clampScale(titleLayout.scale, 'Title X');
   const titleScaleY = clampScale(titleLayout.scale, 'Title Y');
   lines.push(`SETMAG ${titleScaleX} ${titleScaleY}`);
-  lines.push(`TEXT 4 0 ${titleX} ${titleY} ${title}`);
+  lines.push(`TEXT 4 0 ${titleX} ${titleY} ${customTitle}`);
   lines.push(`SETMAG 1 1`);
 
-  // Barcode 1 - with left-aligned clamp adjustment and calibration offset
+  // Barcode 1
   const barcode1HeightMm = Number(barcode1Layout.height);
   const barcode1Scale = barcode1Layout.scale;
   const barcode1Height = calculateBarcodeHeight(barcode1HeightMm, barcode1Scale, 'Barcode 1', 1);
 
-  // Apply calibration offset to barcode 1 position
-  const barcode1Pos = applyCalibrationOffset(
-    Number(barcode1Layout.x),
-    Number(barcode1Layout.y),
-    offsetXmm,
-    offsetYmm
+  const barcode1Pos = applyAllOffsets(
+    Number(barcode1Position.x),
+    Number(barcode1Position.y),
+    globalHorizontalOffset,
+    globalVerticalOffset,
+    calibrationOffsetXmm,
+    calibrationOffsetYmm
   );
 
-  // Estimate barcode width and calculate left-aligned X with clamp (using offset-adjusted X)
   const barcode1WidthEstimate = estimateBarcodeWidthDots(leftSerial.length, barcodeWidth, barcodeRatio);
   const barcode1RequestedX = mmToDots(barcode1Pos.x);
   const barcode1Adjustment = calculateLeftAlignedBarcodeX(
@@ -463,55 +472,42 @@ export function generateCPCLWithTitle(
   const barcode1X = barcode1Adjustment.adjustedX;
   const barcode1Y = mmToDots(barcode1Pos.y);
 
-  // Validate position
-  validateBarcodePosition(barcode1X, barcode1Y, barcode1Height, widthDots, heightDots, 1);
-
   lines.push(
     `BARCODE ${barcodeMapping.cpclToken} ${barcodeWidth} ${barcodeRatio} ${barcode1Height} ${barcode1X} ${barcode1Y} ${leftSerial}`
   );
 
-  logBarcodeGeneration(
-    1,
-    uiType,
-    barcodeMapping.cpclToken,
-    barcodeWidth,
-    barcodeRatio,
-    barcode1Height,
-    barcode1X,
-    barcode1Y,
-    leftSerial,
-    wasFallback
-  );
-
-  // Serial Text 1 - apply calibration offset
-  const serial1Pos = applyCalibrationOffset(
-    Number(serial1Layout.x),
-    Number(serial1Layout.y),
-    offsetXmm,
-    offsetYmm
+  // Serial Text 1
+  const serial1Pos = applyAllOffsets(
+    Number(barcode1Position.x),
+    Number(barcode1Position.y) + barcode1HeightMm + Number(barcode1Position.verticalSpacing),
+    globalHorizontalOffset,
+    globalVerticalOffset,
+    calibrationOffsetXmm,
+    calibrationOffsetYmm
   );
   const serial1X = mmToDots(serial1Pos.x);
   const serial1Y = mmToDots(serial1Pos.y);
-  const serial1ScaleX = clampScale(serial1Layout.scale, 'Serial Text 1 X');
-  const serial1ScaleY = clampScale(serial1Layout.scale, 'Serial Text 1 Y');
+  const serial1Scale = barcode1Layout.scale;
+  const serial1ScaleX = clampScale(serial1Scale, 'Serial Text 1 X');
+  const serial1ScaleY = clampScale(serial1Scale, 'Serial Text 1 Y');
   lines.push(`SETMAG ${serial1ScaleX} ${serial1ScaleY}`);
   lines.push(`TEXT 7 0 ${serial1X} ${serial1Y} ${leftSerial}`);
   lines.push(`SETMAG 1 1`);
 
-  // Barcode 2 - with left-aligned clamp adjustment and calibration offset
+  // Barcode 2
   const barcode2HeightMm = Number(barcode2Layout.height);
   const barcode2Scale = barcode2Layout.scale;
   const barcode2Height = calculateBarcodeHeight(barcode2HeightMm, barcode2Scale, 'Barcode 2', 2);
 
-  // Apply calibration offset to barcode 2 position
-  const barcode2Pos = applyCalibrationOffset(
-    Number(barcode2Layout.x),
-    Number(barcode2Layout.y),
-    offsetXmm,
-    offsetYmm
+  const barcode2Pos = applyAllOffsets(
+    Number(barcode2Position.x),
+    Number(barcode2Position.y),
+    globalHorizontalOffset,
+    globalVerticalOffset,
+    calibrationOffsetXmm,
+    calibrationOffsetYmm
   );
 
-  // Estimate barcode width and calculate left-aligned X with clamp (using offset-adjusted X)
   const barcode2WidthEstimate = estimateBarcodeWidthDots(rightSerial.length, barcodeWidth, barcodeRatio);
   const barcode2RequestedX = mmToDots(barcode2Pos.x);
   const barcode2Adjustment = calculateLeftAlignedBarcodeX(
@@ -524,37 +520,24 @@ export function generateCPCLWithTitle(
   const barcode2X = barcode2Adjustment.adjustedX;
   const barcode2Y = mmToDots(barcode2Pos.y);
 
-  // Validate position
-  validateBarcodePosition(barcode2X, barcode2Y, barcode2Height, widthDots, heightDots, 2);
-
   lines.push(
     `BARCODE ${barcodeMapping.cpclToken} ${barcodeWidth} ${barcodeRatio} ${barcode2Height} ${barcode2X} ${barcode2Y} ${rightSerial}`
   );
 
-  logBarcodeGeneration(
-    2,
-    uiType,
-    barcodeMapping.cpclToken,
-    barcodeWidth,
-    barcodeRatio,
-    barcode2Height,
-    barcode2X,
-    barcode2Y,
-    rightSerial,
-    wasFallback
-  );
-
-  // Serial Text 2 - apply calibration offset
-  const serial2Pos = applyCalibrationOffset(
-    Number(serial2Layout.x),
-    Number(serial2Layout.y),
-    offsetXmm,
-    offsetYmm
+  // Serial Text 2
+  const serial2Pos = applyAllOffsets(
+    Number(barcode2Position.x),
+    Number(barcode2Position.y) + barcode2HeightMm + Number(barcode2Position.verticalSpacing),
+    globalHorizontalOffset,
+    globalVerticalOffset,
+    calibrationOffsetXmm,
+    calibrationOffsetYmm
   );
   const serial2X = mmToDots(serial2Pos.x);
   const serial2Y = mmToDots(serial2Pos.y);
-  const serial2ScaleX = clampScale(serial2Layout.scale, 'Serial Text 2 X');
-  const serial2ScaleY = clampScale(serial2Layout.scale, 'Serial Text 2 Y');
+  const serial2Scale = barcode2Layout.scale;
+  const serial2ScaleX = clampScale(serial2Scale, 'Serial Text 2 X');
+  const serial2ScaleY = clampScale(serial2Scale, 'Serial Text 2 Y');
   lines.push(`SETMAG ${serial2ScaleX} ${serial2ScaleY}`);
   lines.push(`TEXT 7 0 ${serial2X} ${serial2Y} ${rightSerial}`);
   lines.push(`SETMAG 1 1`);

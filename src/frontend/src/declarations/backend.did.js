@@ -21,6 +21,12 @@ export const LayoutSettings = IDL.Record({
   'scale' : IDL.Float64,
   'width' : IDL.Int,
   'fontSize' : IDL.Nat,
+  'verticalSpacing' : IDL.Nat,
+});
+export const BarcodePosition = IDL.Record({
+  'x' : IDL.Int,
+  'y' : IDL.Int,
+  'verticalSpacing' : IDL.Nat,
 });
 export const PrefixMapping = IDL.Record({
   'title' : IDL.Text,
@@ -28,15 +34,19 @@ export const PrefixMapping = IDL.Record({
 });
 export const LabelSettings = IDL.Record({
   'barcode2Layout' : LayoutSettings,
+  'barcode1Position' : BarcodePosition,
+  'globalHorizontalOffset' : IDL.Nat,
   'widthMm' : IDL.Nat,
   'heightMm' : IDL.Nat,
   'serialText1Layout' : LayoutSettings,
   'serialText2Layout' : LayoutSettings,
   'spacing' : IDL.Nat,
+  'globalVerticalOffset' : IDL.Nat,
   'barcodeType' : IDL.Text,
   'prefixMappings' : IDL.Vec(IDL.Tuple(IDL.Text, PrefixMapping)),
   'barcodeHeight' : IDL.Nat,
   'barcode1Layout' : LayoutSettings,
+  'barcode2Position' : BarcodePosition,
   'titleLayout' : LayoutSettings,
 });
 export const Time = IDL.Int;
@@ -88,6 +98,12 @@ export const idlFactory = ({ IDL }) => {
     'scale' : IDL.Float64,
     'width' : IDL.Int,
     'fontSize' : IDL.Nat,
+    'verticalSpacing' : IDL.Nat,
+  });
+  const BarcodePosition = IDL.Record({
+    'x' : IDL.Int,
+    'y' : IDL.Int,
+    'verticalSpacing' : IDL.Nat,
   });
   const PrefixMapping = IDL.Record({
     'title' : IDL.Text,
@@ -95,15 +111,19 @@ export const idlFactory = ({ IDL }) => {
   });
   const LabelSettings = IDL.Record({
     'barcode2Layout' : LayoutSettings,
+    'barcode1Position' : BarcodePosition,
+    'globalHorizontalOffset' : IDL.Nat,
     'widthMm' : IDL.Nat,
     'heightMm' : IDL.Nat,
     'serialText1Layout' : LayoutSettings,
     'serialText2Layout' : LayoutSettings,
     'spacing' : IDL.Nat,
+    'globalVerticalOffset' : IDL.Nat,
     'barcodeType' : IDL.Text,
     'prefixMappings' : IDL.Vec(IDL.Tuple(IDL.Text, PrefixMapping)),
     'barcodeHeight' : IDL.Nat,
     'barcode1Layout' : LayoutSettings,
+    'barcode2Position' : BarcodePosition,
     'titleLayout' : LayoutSettings,
   });
   const Time = IDL.Int;

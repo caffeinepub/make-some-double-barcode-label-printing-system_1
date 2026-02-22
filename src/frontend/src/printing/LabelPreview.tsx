@@ -32,10 +32,12 @@ export default function LabelPreview({
   const widthMm = Number(settings.widthMm);
   const heightMm = Number(settings.heightMm);
   
-  // Get calibration offsets (default to 0 if not present)
+  // Get all offsets
   const extendedSettings = settings as ExtendedLabelSettings;
-  const offsetXmm = extendedSettings.calibrationOffsetXmm ?? 0;
-  const offsetYmm = extendedSettings.calibrationOffsetYmm ?? 0;
+  const globalHorizontalOffset = Number(settings.globalHorizontalOffset || 0);
+  const globalVerticalOffset = Number(settings.globalVerticalOffset || 0);
+  const calibrationOffsetXmm = extendedSettings.calibrationOffsetXmm ?? 0;
+  const calibrationOffsetYmm = extendedSettings.calibrationOffsetYmm ?? 0;
   
   // Use authoritative mm-to-px conversion for true 48x30mm sizing
   const widthPx = mmToPx(widthMm);
@@ -47,15 +49,20 @@ export default function LabelPreview({
   const barcodeWidth = barcodeMapping.recommendedWidth;
   const barcodeRatio = barcodeMapping.recommendedRatio;
 
-  // Helper to convert layout settings to pixels with clamp adjustment and calibration offset
+  // Apply all offsets to a position
+  const applyAllOffsets = (xMm: number, yMm: number) => ({
+    x: xMm + globalHorizontalOffset + calibrationOffsetXmm,
+    y: yMm + globalVerticalOffset + calibrationOffsetYmm,
+  });
+
+  // Helper to convert layout settings to pixels with clamp adjustment and all offsets
   const layoutToPx = (layout: any, serial: string, barcodeIndex: 1 | 2 | null) => {
-    // Apply calibration offset to base position (in mm)
-    const xMm = Number(layout.x) + offsetXmm;
-    const yMm = Number(layout.y) + offsetYmm;
+    // Apply all offsets to base position (in mm)
+    const offsetPos = applyAllOffsets(Number(layout.x), Number(layout.y));
     
     const basePx = {
-      x: mmToPx(xMm),
-      y: mmToPx(yMm),
+      x: mmToPx(offsetPos.x),
+      y: mmToPx(offsetPos.y),
       width: mmToPx(Number(layout.width)),
       height: mmToPx(Number(layout.height)),
       fontSize: Number(layout.fontSize) * layout.scale,
@@ -65,7 +72,7 @@ export default function LabelPreview({
     // Apply clamp adjustment for barcodes (matching CPCL generator)
     if (barcodeIndex) {
       const estimatedWidthDots = estimateBarcodeWidthDots(serial.length, barcodeWidth, barcodeRatio);
-      const requestedXDots = mmToDots(xMm); // Left edge position in dots
+      const requestedXDots = mmToDots(offsetPos.x); // Left edge position in dots
       const adjustment = calculateLeftAlignedBarcodeX(estimatedWidthDots, widthDots, requestedXDots, barcodeIndex);
       // Convert adjusted dots back to preview pixels
       basePx.x = dotsToPx(adjustment.adjustedX);
@@ -74,11 +81,54 @@ export default function LabelPreview({
     return basePx;
   };
 
+  // Title uses titleLayout
   const titlePx = layoutToPx(settings.titleLayout, '', null);
-  const barcode1Px = layoutToPx(settings.barcode1Layout, sampleSerial1, 1);
-  const serial1Px = layoutToPx(settings.serialText1Layout, '', null);
-  const barcode2Px = layoutToPx(settings.barcode2Layout, sampleSerial2, 2);
-  const serial2Px = layoutToPx(settings.serialText2Layout, '', null);
+  
+  // Barcode 1 uses barcode1Position
+  const barcode1HeightMm = Number(settings.barcode1Layout.height);
+  const barcode1PositionLayout = {
+    x: settings.barcode1Position.x,
+    y: settings.barcode1Position.y,
+    width: settings.barcode1Layout.width,
+    height: settings.barcode1Layout.height,
+    fontSize: settings.barcode1Layout.fontSize,
+    scale: settings.barcode1Layout.scale,
+  };
+  const barcode1Px = layoutToPx(barcode1PositionLayout, sampleSerial1, 1);
+  
+  // Serial 1 positioned below barcode 1 using verticalSpacing
+  const serial1PositionLayout = {
+    x: settings.barcode1Position.x,
+    y: BigInt(Number(settings.barcode1Position.y) + barcode1HeightMm + Number(settings.barcode1Position.verticalSpacing)),
+    width: settings.serialText1Layout.width,
+    height: settings.serialText1Layout.height,
+    fontSize: settings.serialText1Layout.fontSize,
+    scale: settings.serialText1Layout.scale,
+  };
+  const serial1Px = layoutToPx(serial1PositionLayout, '', null);
+  
+  // Barcode 2 uses barcode2Position
+  const barcode2HeightMm = Number(settings.barcode2Layout.height);
+  const barcode2PositionLayout = {
+    x: settings.barcode2Position.x,
+    y: settings.barcode2Position.y,
+    width: settings.barcode2Layout.width,
+    height: settings.barcode2Layout.height,
+    fontSize: settings.barcode2Layout.fontSize,
+    scale: settings.barcode2Layout.scale,
+  };
+  const barcode2Px = layoutToPx(barcode2PositionLayout, sampleSerial2, 2);
+  
+  // Serial 2 positioned below barcode 2 using verticalSpacing
+  const serial2PositionLayout = {
+    x: settings.barcode2Position.x,
+    y: BigInt(Number(settings.barcode2Position.y) + barcode2HeightMm + Number(settings.barcode2Position.verticalSpacing)),
+    width: settings.serialText2Layout.width,
+    height: settings.serialText2Layout.height,
+    fontSize: settings.serialText2Layout.fontSize,
+    scale: settings.serialText2Layout.scale,
+  };
+  const serial2Px = layoutToPx(serial2PositionLayout, '', null);
 
   // Generate barcode SVGs with estimated width for accurate preview
   const barcode1WidthDots = estimateBarcodeWidthDots(sampleSerial1.length, barcodeWidth, barcodeRatio);

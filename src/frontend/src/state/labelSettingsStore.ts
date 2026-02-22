@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { LabelSettings as BackendLabelSettings, LayoutSettings } from '../backend';
+import type { LabelSettings as BackendLabelSettings, LayoutSettings, BarcodePosition } from '../backend';
 
 // Extended settings with calibration offsets
 export interface ExtendedLabelSettings extends BackendLabelSettings {
@@ -15,36 +15,47 @@ interface LabelSettingsState {
 }
 
 // Default layout settings
-const createDefaultLayout = (x: number, y: number, width: number, height: number, fontSize: number): LayoutSettings => ({
+const createDefaultLayout = (x: number, y: number, width: number, height: number, fontSize: number, verticalSpacing: number = 0): LayoutSettings => ({
   x: BigInt(x),
   y: BigInt(y),
   scale: 1.0,
   width: BigInt(width),
   height: BigInt(height),
   fontSize: BigInt(fontSize),
+  verticalSpacing: BigInt(verticalSpacing),
 });
 
-// Updated default settings for 48x30mm label with left-aligned layout
-// Consistent left padding (X=2mm) for all elements
-// Improved vertical spacing with second barcode+serial moved lower
+// Default barcode position
+const createDefaultBarcodePosition = (x: number, y: number, verticalSpacing: number): BarcodePosition => ({
+  x: BigInt(x),
+  y: BigInt(y),
+  verticalSpacing: BigInt(verticalSpacing),
+});
+
+// Updated default settings for 58mm × 43mm label matching reference photo layout:
+// - Primary barcode at top (y=2mm) with serial text 1mm below
+// - Secondary barcode in middle (y=14mm) with serial text 1mm below
 const defaultSettings: ExtendedLabelSettings = {
-  widthMm: BigInt(48),
-  heightMm: BigInt(30),
+  widthMm: BigInt(58),
+  heightMm: BigInt(43),
   barcodeType: 'CODE128',
   barcodeHeight: BigInt(8),
   spacing: BigInt(3),
   prefixMappings: [],
-  // Title at top with consistent left padding
-  titleLayout: createDefaultLayout(2, 1, 44, 4, 10),
-  // First barcode with left padding (X=2mm acts as left padding, not center)
-  barcode1Layout: createDefaultLayout(2, 6, 44, 8, 8),
-  // First serial text below first barcode
-  serialText1Layout: createDefaultLayout(2, 15, 44, 2, 7),
-  // Second barcode moved significantly lower for better separation
-  barcode2Layout: createDefaultLayout(2, 18, 44, 8, 8),
-  // Second serial text below second barcode
-  serialText2Layout: createDefaultLayout(2, 27, 44, 2, 7),
-  // Calibration offsets (default 0mm)
+  // Title at top
+  titleLayout: createDefaultLayout(2, 1, 54, 4, 10, 0),
+  // Barcode layouts (kept for backward compatibility but positions control actual placement)
+  barcode1Layout: createDefaultLayout(2, 2, 54, 8, 8, 0),
+  serialText1Layout: createDefaultLayout(2, 11, 54, 2, 7, 0),
+  barcode2Layout: createDefaultLayout(2, 14, 54, 8, 8, 0),
+  serialText2Layout: createDefaultLayout(2, 23, 54, 2, 7, 0),
+  // Barcode positions - these control actual placement
+  barcode1Position: createDefaultBarcodePosition(2, 2, 1),  // Top barcode, 1mm spacing to text
+  barcode2Position: createDefaultBarcodePosition(2, 14, 1), // Middle barcode, 1mm spacing to text
+  // Global offsets
+  globalVerticalOffset: BigInt(0),
+  globalHorizontalOffset: BigInt(0),
+  // Calibration offsets
   calibrationOffsetXmm: 0,
   calibrationOffsetYmm: 0,
 };
@@ -90,61 +101,27 @@ const bigIntStorage = {
 
 // Migration function to convert old settings to new layout structure
 function migrateSettings(settings: any, version: number): ExtendedLabelSettings {
-  // If already has new layout structure, check if it needs updates
-  if (settings.titleLayout && settings.barcode1Layout) {
-    // Check if this is the old default layout (version 2) that needs updating
-    const isOldDefault = 
-      Number(settings.barcode2Layout?.y || 0) === 19 && 
-      Number(settings.serialText2Layout?.y || 0) === 28;
-    
-    if (version < 3 && isOldDefault) {
-      // Apply new default layout with better spacing
-      return {
-        ...settings,
-        barcode2Layout: createDefaultLayout(2, 18, 44, 8, 8),
-        serialText2Layout: createDefaultLayout(2, 27, 44, 2, 7),
-        calibrationOffsetXmm: settings.calibrationOffsetXmm ?? 0,
-        calibrationOffsetYmm: settings.calibrationOffsetYmm ?? 0,
-      };
-    }
-    
-    // Ensure calibration offsets exist (version 4 migration)
+  // Ensure barcode positions exist
+  if (!settings.barcode1Position || !settings.barcode2Position) {
     return {
       ...settings,
+      widthMm: BigInt(58),
+      heightMm: BigInt(43),
+      barcode1Position: settings.barcode1Position || createDefaultBarcodePosition(2, 2, 1),
+      barcode2Position: settings.barcode2Position || createDefaultBarcodePosition(2, 14, 1),
       calibrationOffsetXmm: settings.calibrationOffsetXmm ?? 0,
       calibrationOffsetYmm: settings.calibrationOffsetYmm ?? 0,
     } as ExtendedLabelSettings;
   }
 
-  // Migrate from old structure (version 0 or 1)
-  const widthMm = Number(settings.widthMm || 48);
-  const heightMm = Number(settings.heightMm || 30);
-  const barcodeHeight = Number(settings.barcodeHeight || 8);
-  const spacing = Number(settings.spacing || 3);
-  const fontSize = 7;
-
-  // Calculate positions based on old logic
-  const titleY = 1;
-  const barcode1Y = titleY + 5;
-  const serial1Y = barcode1Y + barcodeHeight + 1;
-  const barcode2Y = serial1Y + spacing;
-  const serial2Y = barcode2Y + barcodeHeight + 1;
-
+  // Ensure calibration offsets exist and update dimensions to 58×43
   return {
-    widthMm: BigInt(widthMm),
-    heightMm: BigInt(heightMm),
-    barcodeType: settings.barcodeType || 'CODE128',
-    barcodeHeight: BigInt(barcodeHeight),
-    spacing: BigInt(spacing),
-    prefixMappings: settings.prefixMappings || [],
-    titleLayout: createDefaultLayout(2, titleY, widthMm - 4, 4, 10),
-    barcode1Layout: createDefaultLayout(2, barcode1Y, widthMm - 4, barcodeHeight, fontSize),
-    serialText1Layout: createDefaultLayout(2, serial1Y, widthMm - 4, 2, fontSize),
-    barcode2Layout: createDefaultLayout(2, barcode2Y, widthMm - 4, barcodeHeight, fontSize),
-    serialText2Layout: createDefaultLayout(2, serial2Y, widthMm - 4, 2, fontSize),
-    calibrationOffsetXmm: 0,
-    calibrationOffsetYmm: 0,
-  };
+    ...settings,
+    widthMm: BigInt(58),
+    heightMm: BigInt(43),
+    calibrationOffsetXmm: settings.calibrationOffsetXmm ?? 0,
+    calibrationOffsetYmm: settings.calibrationOffsetYmm ?? 0,
+  } as ExtendedLabelSettings;
 }
 
 export const useLabelSettings = create<LabelSettingsState>()(
@@ -157,10 +134,10 @@ export const useLabelSettings = create<LabelSettingsState>()(
     {
       name: 'label-settings',
       storage: createJSONStorage(() => bigIntStorage),
-      version: 4, // Bumped to 4 for calibration offsets
+      version: 6, // Bumped to 6 for 58×43mm dimensions
       migrate: (persistedState: any, version: number) => {
-        if (version < 4) {
-          // Migrate old settings to new layout structure with calibration offsets
+        if (version < 6) {
+          // Migrate old settings to include barcode positions and new dimensions
           const migratedSettings = persistedState.settings
             ? migrateSettings(persistedState.settings, version)
             : defaultSettings;

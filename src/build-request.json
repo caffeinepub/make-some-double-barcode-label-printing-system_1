@@ -1,96 +1,98 @@
 {
   "kind": "build_request",
-  "title": "Fix barcode alignment to match preview in CPCL printouts",
-  "projectName": "Label Printer",
+  "title": "Fix label dimensions, barcode width, and scanning validation",
+  "projectName": "Label Scanner",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Adjust CPCL barcode generation parameters in cpclGenerator.ts to ensure barcodes fit completely within the label boundaries when printed using CPCL protocol",
-      "target": "frontend",
+      "text": "Update label dimensions to 58mm width × 43mm height in the label settings store and ensure all CPCL generation uses these exact dimensions",
+      "target": "both",
       "source": {
         "messageIds": [
-          "msg-latest"
+          "msg-last"
         ],
         "quotes": [
-          "Why my label print out doesn't look like preview? Barcode still is not fully on label.",
-          "remember label is printed out using cpcl protocol"
+          "Label size us 58mx43mm"
         ]
       },
       "acceptanceCriteria": [
-        "Barcodes are fully visible on printed labels without any clipping at edges",
-        "Both upper and lower barcodes fit completely within the label boundaries"
+        "Label settings store default dimensions are set to 58mm × 43mm",
+        "CPCL generator uses 58mm × 43mm for label boundaries",
+        "Label preview displays 58mm × 43mm dimensions"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Calibrate barcode positioning calculations in cpclLayoutAdjustments.ts to account for CPCL printer coordinate system and ensure printout matches the preview shown in the uploaded photo",
+      "text": "Adjust barcode width parameters to ensure both barcodes fit completely within the 58mm label width for scannable output, matching the layout shown in the uploaded reference photos where barcodes span nearly the full label width without clipping",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-latest"
+          "msg-last"
         ],
         "quotes": [
-          "Adjust to make print out exactly how is on preview showed on photo",
-          "Make that finally work"
+          "just change barcode width to make sure whole barcode is fit on label so can be scanned",
+          "Make sure label look like on that photo"
         ]
       },
       "acceptanceCriteria": [
-        "Printed label layout matches the preview display pixel-for-pixel",
-        "Barcode horizontal positioning on printout matches preview positioning",
-        "Text and barcode vertical spacing matches preview"
+        "Both barcodes fit within 58mm label width with no clipping",
+        "Barcode width is adjusted in CPCL generation to maximize width while staying within boundaries",
+        "Generated labels match the visual layout of the reference photos (1771682557066499855940811118309.jpg, image-11.png, 17717694923414593234117505414352.jpg, image-12.png)",
+        "Printed barcodes are scannable without manual adjustment"
       ]
     },
     {
       "id": "REQ-3",
-      "text": "Review and adjust barcode width estimation logic for CODE128 barcodes in cpclLayoutAdjustments.ts to accurately calculate barcode dimensions for CPCL protocol output",
+      "text": "When scanning the 1st or 2nd barcode in ScanPrintTab, if the scanned barcode has an incorrect prefix (not matching any configured prefix mappings), display an error message, play the error sound, and automatically clear the input box so the user can scan again immediately",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-latest"
+          "msg-last"
         ],
         "quotes": [
-          "Barcode still is not fully on label",
-          "Adjust settings"
+          "When scanning 1st or 2nd barcode and if barcode got incorrect prefix except show error and making sound clear the box so can be scanned again"
         ]
       },
       "acceptanceCriteria": [
-        "Barcode width calculations accurately reflect actual printed dimensions",
-        "Center alignment calculations use correct barcode width values",
-        "No barcode overflow beyond label edges"
+        "Error message displays when scanned barcode prefix does not match any configured prefix mapping",
+        "Error sound plays when incorrect prefix detected",
+        "Input box is cleared automatically after showing error",
+        "User can immediately scan again without manual intervention",
+        "Validation applies to both first and second barcode scans"
       ]
     },
     {
       "id": "REQ-4",
-      "text": "Update LabelPreview.tsx to accurately represent CPCL printer output so the preview matches actual printed results with correct scaling and positioning",
+      "text": "Detect and show an error if the user scans the same serial number again (duplicate serial detection), preventing duplicate processing",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-latest"
+          "msg-last"
         ],
         "quotes": [
-          "Why my label print out doesn't look like preview?",
-          "make print out exactly how is on preview"
+          "Is user scan same serial again show error"
         ]
       },
       "acceptanceCriteria": [
-        "Preview display accurately represents what will be printed via CPCL",
-        "Barcode dimensions in preview match printed barcode dimensions",
-        "Element positioning in preview matches physical printout positions"
+        "System detects when the same serial number is scanned twice",
+        "Error message displays clearly indicating duplicate serial",
+        "Duplicate serial is not processed or printed",
+        "Error sound plays on duplicate detection"
       ]
     }
   ],
   "constraints": [
-    "All changes must maintain CPCL protocol compatibility",
-    "Do not modify the backend/main.mo file",
-    "Do not alter the USB printer communication layer in usbCpclTransport.ts",
-    "Preserve existing calibration offset functionality"
+    "Maintain existing barcode validation and prefix mapping logic",
+    "Do not modify authentication or Internet Identity integration",
+    "Preserve existing label settings import/export functionality",
+    "Keep single-actor backend architecture"
   ],
   "nonGoals": [
-    "Changing the barcode symbology type",
-    "Adding new label types or templates",
-    "Modifying the scanning workflow",
-    "Altering printer connection logic"
+    "Changing label type definitions (Dual Band, Tri Band, New Dual Band)",
+    "Modifying printer connection or USB transport logic",
+    "Altering backend schema or migration logic",
+    "Adding new barcode types beyond existing supported types"
   ],
   "imageRequirements": {
     "required": [],

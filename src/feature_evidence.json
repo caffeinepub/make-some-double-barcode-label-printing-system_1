@@ -2,10 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-adjust-cpcl-barcode-generation-parameters-in-cpclgenerator-ts-to-ensure-barcodes-fit-completely-within-the-label-boundaries-when-printed-using-cpcl-protocol",
-      "featureTitle": "Adjust CPCL barcode generation parameters in cpclGenerator.ts to ensure barcodes fit completely within the label boundaries when printed using CPCL protocol",
+      "featureId": "feature-update-label-dimensions-to-58mm-width-43mm-height-in-the-label-settings-store-and-ensure-all-cpcl-generation-uses-these-exact-dimensions",
+      "featureTitle": "Update label dimensions to 58mm width × 43mm height in the label settings store and ensure all CPCL generation uses these exact dimensions",
       "files": [
-        "frontend/src/printing/cpclLayoutAdjustments.ts"
+        "frontend/src/state/labelSettingsStore.ts"
       ],
       "components": [
         "authorization@4.0.0",
@@ -21,11 +21,11 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-calibrate-barcode-positioning-calculations-in-cpcllayoutadjustments-ts-to-account-for-cpcl-printer-coordinate-system-and-ensure-printout-matches-the-preview-shown-in-the-uploaded-photo",
-      "featureTitle": "Calibrate barcode positioning calculations in cpclLayoutAdjustments.ts to account for CPCL printer coordinate system and ensure printout matches the preview shown in the uploaded photo",
+      "featureId": "feature-adjust-barcode-width-parameters-to-ensure-both-barcodes-fit-completely-within-the-58mm-label-width-for-scannable-output-matching-the-layout-shown-in-the-uploaded-reference-photos-where-barcodes-span-nearly-the-full-label-width-without-clipping",
+      "featureTitle": "Adjust barcode width parameters to ensure both barcodes fit completely within the 58mm label width for scannable output, matching the layout shown in the uploaded reference photos where barcodes span nearly the full label width without clipping",
       "files": [
-        "frontend/src/printing/LabelPreview.tsx",
-        "frontend/src/printing/cpclLayoutAdjustments.ts"
+        "frontend/src/printing/cpclLayoutAdjustments.ts",
+        "frontend/src/state/labelSettingsStore.ts"
       ],
       "components": [
         "authorization@4.0.0",
@@ -41,10 +41,10 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-review-and-adjust-barcode-width-estimation-logic-for-code128-barcodes-in-cpcllayoutadjustments-ts-to-accurately-calculate-barcode-dimensions-for-cpcl-protocol-output",
-      "featureTitle": "Review and adjust barcode width estimation logic for CODE128 barcodes in cpclLayoutAdjustments.ts to accurately calculate barcode dimensions for CPCL protocol output",
+      "featureId": "feature-when-scanning-the-1st-or-2nd-barcode-in-scanprinttab-if-the-scanned-barcode-has-an-incorrect-prefix-not-matching-any-configured-prefix-mappings-display-an-error-message-play-the-error-sound-and-automatically-clear-the-input-box-so-the-user-can-scan-again-immediately",
+      "featureTitle": "When scanning the 1st or 2nd barcode in ScanPrintTab, if the scanned barcode has an incorrect prefix (not matching any configured prefix mappings), display an error message, play the error sound, and automatically clear the input box so the user can scan again immediately",
       "files": [
-        "frontend/src/printing/cpclLayoutAdjustments.ts"
+        "frontend/src/tabs/ScanPrintTab.tsx"
       ],
       "components": [
         "authorization@4.0.0",
@@ -60,10 +60,10 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-update-labelpreview-tsx-to-accurately-represent-cpcl-printer-output-so-the-preview-matches-actual-printed-results-with-correct-scaling-and-positioning",
-      "featureTitle": "Update LabelPreview.tsx to accurately represent CPCL printer output so the preview matches actual printed results with correct scaling and positioning",
+      "featureId": "feature-detect-and-show-an-error-if-the-user-scans-the-same-serial-number-again-duplicate-serial-detection-preventing-duplicate-processing",
+      "featureTitle": "Detect and show an error if the user scans the same serial number again (duplicate serial detection), preventing duplicate processing",
       "files": [
-        "frontend/src/printing/LabelPreview.tsx"
+        "frontend/src/tabs/ScanPrintTab.tsx"
       ],
       "components": [
         "authorization@4.0.0",

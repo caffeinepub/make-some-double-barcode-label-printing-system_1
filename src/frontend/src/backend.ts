@@ -92,16 +92,25 @@ export class ExternalBlob {
 export type Time = bigint;
 export interface LabelSettings {
     barcode2Layout: LayoutSettings;
+    barcode1Position: BarcodePosition;
+    globalHorizontalOffset: bigint;
     widthMm: bigint;
     heightMm: bigint;
     serialText1Layout: LayoutSettings;
     serialText2Layout: LayoutSettings;
     spacing: bigint;
+    globalVerticalOffset: bigint;
     barcodeType: string;
     prefixMappings: Array<[string, PrefixMapping]>;
     barcodeHeight: bigint;
     barcode1Layout: LayoutSettings;
+    barcode2Position: BarcodePosition;
     titleLayout: LayoutSettings;
+}
+export interface BarcodePosition {
+    x: bigint;
+    y: bigint;
+    verticalSpacing: bigint;
 }
 export interface LayoutSettings {
     x: bigint;
@@ -110,6 +119,7 @@ export interface LayoutSettings {
     scale: number;
     width: bigint;
     fontSize: bigint;
+    verticalSpacing: bigint;
 }
 export interface PrefixMapping {
     title: string;

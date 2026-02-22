@@ -1,98 +1,98 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix barcode alignment to match preview in CPCL printouts",
+  "title": "Fix label dimensions, barcode width, and scanning validation",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Adjust CPCL barcode generation parameters to ensure barcodes fit completely within label boundaries",
+      "summary": "Update label dimensions to 58mm × 43mm and ensure all components use these exact dimensions",
       "acceptanceCriteria": [
-        "Barcodes are fully visible on printed labels without any clipping at edges",
-        "Both upper and lower barcodes fit completely within the label boundaries"
+        "Label settings store default dimensions are set to 58mm × 43mm",
+        "CPCL generator uses 58mm × 43mm for label boundaries",
+        "Label preview displays 58mm × 43mm dimensions"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/printing/cpclGenerator.ts",
+          "path": "frontend/src/state/labelSettingsStore.ts",
           "operation": "modify",
-          "description": "Review and adjust barcode generation parameters including barcode height calculation, scale clamping logic, and CPCL command string construction. Ensure barcode dimensions account for CPCL printer coordinate system and margins to prevent edge clipping. Verify barcode height does not exceed available vertical space after accounting for text elements and spacing. Add defensive bounds checking before generating CPCL BARCODE commands."
+          "description": "Update the default label dimensions in the store initialization from current values to widthMm: 58 and heightMm: 43. Ensure these defaults apply to new installations and are used when no persisted settings exist."
         },
         {
-          "path": "frontend/src/printing/cpclLayoutAdjustments.ts",
+          "path": "frontend/src/printing/cpclGenerator.ts",
           "operation": "modify",
-          "description": "Refine barcode positioning and clamping utilities to ensure barcodes remain fully within label boundaries. Review and adjust the CODE128 barcode width estimation logic to accurately reflect actual printed dimensions for center alignment calculations. Update clampBarcodePosition to account for true barcode width including quiet zones. Ensure horizontal positioning calculations prevent any barcode overflow beyond label edges."
+          "description": "Verify that CPCL generation respects the widthMm and heightMm values from labelSettings for label boundaries. Ensure all positioning and clipping logic uses these dimensions (converted to dots at 203 DPI) rather than hardcoded values."
+        },
+        {
+          "path": "frontend/src/printing/LabelPreview.tsx",
+          "operation": "modify",
+          "description": "Ensure the preview component renders labels using the exact dimensions from labelSettings (58mm × 43mm). Verify the preview canvas scales correctly to display the full label area at various zoom levels."
         }
       ]
     },
     {
       "id": "REQ-2",
-      "summary": "Calibrate barcode positioning calculations to match CPCL printer coordinate system and ensure printout matches preview",
+      "summary": "Adjust barcode width parameters to ensure both barcodes fit completely within the 58mm label width for scannable output",
       "acceptanceCriteria": [
-        "Printed label layout matches the preview display pixel-for-pixel",
-        "Barcode horizontal positioning on printout matches preview positioning",
-        "Text and barcode vertical spacing matches preview"
+        "Both barcodes fit within 58mm label width with no clipping",
+        "Barcode width is adjusted in CPCL generation to maximize width while staying within boundaries",
+        "Generated labels match the visual layout of the reference photos (frontend/public/assets/1771682557066499855940811118309.jpg, frontend/public/assets/image-11.png, frontend/public/assets/17717694923414593234117505414352.jpg, frontend/public/assets/image-12.png)",
+        "Printed barcodes are scannable without manual adjustment"
       ],
       "file_operations": [
         {
           "path": "frontend/src/printing/cpclLayoutAdjustments.ts",
           "operation": "modify",
-          "description": "Calibrate coordinate transformations between logical layout coordinates and CPCL printer dots. Review centerAlignBarcode function to ensure it accurately calculates barcode center positions accounting for CPCL's coordinate origin and any printer-specific offsets. Adjust positioning logic to match the preview's visual layout when translated to CPCL commands. Verify calibration offset application is consistent between preview and print generation."
+          "description": "Update the barcode width calculation logic to ensure barcodes span nearly the full 58mm label width (converted to dots) while avoiding clipping. Adjust the clampBarcodeX function and estimateCODE128WidthDots to account for the new label dimensions and match the reference photo layout where barcodes extend edge-to-edge."
         },
         {
           "path": "frontend/src/printing/cpclGenerator.ts",
           "operation": "modify",
-          "description": "Ensure CPCL command generation applies the same coordinate transformations and calibration offsets used in the preview rendering. Verify that barcode and text positioning in the generated CPCL string matches the calculated positions used by LabelPreview. Add validation to ensure vertical spacing between elements (title, barcodes, serial text) is preserved in the CPCL output."
+          "description": "Adjust the CPCL barcode generation commands to use optimized width parameters that maximize barcode width within the 58mm label boundaries. Ensure both barcode1 and barcode2 use consistent width settings and apply layout adjustments from cpclLayoutAdjustments.ts. Add validation logging to confirm barcodes fit within label bounds."
         },
         {
           "path": "frontend/src/printing/LabelPreview.tsx",
           "operation": "modify",
-          "description": "Review preview coordinate transformations to ensure they accurately represent the CPCL printer's coordinate system. Verify that calibration offsets and center-aligned barcode positioning adjustments in the preview match those applied in cpclGenerator. Ensure the preview's SVG barcode dimensions and positions reflect the actual printed output by using the same width estimation and positioning calculations."
+          "description": "Update the preview rendering to reflect the adjusted barcode widths. Ensure the preview accurately shows barcodes spanning nearly the full label width, matching the reference photos. Apply the same width calculations used in CPCL generation to the SVG preview elements."
+        },
+        {
+          "path": "frontend/src/state/labelSettingsStore.ts",
+          "operation": "modify",
+          "description": "Review and adjust default barcode layout settings (barcode1Layout.width, barcode2Layout.width) to support wider barcodes within the 58mm label. Ensure these defaults produce scannable barcodes that match the reference photo layout."
         }
       ]
     },
     {
       "id": "REQ-3",
-      "summary": "Review and adjust barcode width estimation logic for CODE128 barcodes to accurately calculate dimensions for CPCL output",
+      "summary": "When scanning with incorrect barcode prefix, display error, play sound, and automatically clear input for immediate re-scan",
       "acceptanceCriteria": [
-        "Barcode width calculations accurately reflect actual printed dimensions",
-        "Center alignment calculations use correct barcode width values",
-        "No barcode overflow beyond label edges"
+        "Error message displays when scanned barcode prefix does not match any configured prefix mapping",
+        "Error sound plays when incorrect prefix detected",
+        "Input box is cleared automatically after showing error",
+        "User can immediately scan again without manual intervention",
+        "Validation applies to both first and second barcode scans"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/printing/cpclLayoutAdjustments.ts",
+          "path": "frontend/src/tabs/ScanPrintTab.tsx",
           "operation": "modify",
-          "description": "Review the estimateCode128BarcodeWidth function to ensure it accurately models the actual printed barcode width for CODE128 symbology in CPCL. Verify the calculation accounts for start/stop characters, check digits, narrow/wide bar ratios, and the configured scale factor. Cross-reference against CPCL barcode width behavior and adjust the estimation formula if needed. Update clamping logic to use the corrected width estimation to prevent barcodes from exceeding label boundaries."
-        },
-        {
-          "path": "frontend/src/printing/cpclBarcodeMapping.ts",
-          "operation": "modify",
-          "description": "Review the CODE128 barcode mapping parameters (width, ratio) to ensure they align with CPCL printer behavior and the width estimation logic in cpclLayoutAdjustments. Verify that the recommended parameters produce barcodes that match the estimated dimensions. Adjust parameters if discrepancies are found between estimated and actual printed widths."
+          "description": "Enhance the barcode scanning validation logic for both serial1 and serial2 inputs. When a scanned barcode prefix does not match any configured prefix mapping in labelSettings, trigger the error sound from soundSystem, display a clear error message indicating the invalid prefix, and automatically clear the input field (set value to empty string) so the user can scan again immediately. Ensure this validation runs before any other processing and applies to both first and second barcode scans."
         }
       ]
     },
     {
       "id": "REQ-4",
-      "summary": "Update LabelPreview to accurately represent CPCL printer output with correct scaling and positioning",
+      "summary": "Detect and show an error if the user scans the same serial number again (duplicate serial detection)",
       "acceptanceCriteria": [
-        "Preview display accurately represents what will be printed via CPCL",
-        "Barcode dimensions in preview match printed barcode dimensions",
-        "Element positioning in preview matches physical printout positions"
+        "System detects when the same serial number is scanned twice",
+        "Error message displays clearly indicating duplicate serial",
+        "Duplicate serial is not processed or printed",
+        "Error sound plays on duplicate detection"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/printing/LabelPreview.tsx",
+          "path": "frontend/src/tabs/ScanPrintTab.tsx",
           "operation": "modify",
-          "description": "Update the preview rendering to use the same barcode width estimation logic from cpclLayoutAdjustments for sizing the SVG barcode elements. Ensure barcode and text positioning in the preview applies the same coordinate transformations, calibration offsets, and center-alignment adjustments used in cpclGenerator. Verify that the preview's scale factor and unit conversions match the CPCL printer's 203 DPI output. Add visual debugging aids if needed to compare preview vs. printed layout."
-        },
-        {
-          "path": "frontend/src/printing/previewUnits.ts",
-          "operation": "modify",
-          "description": "Review and verify that unit conversion functions (millimeters to printer dots, dots to CSS pixels) accurately represent the CPCL printer's 203 DPI resolution. Ensure the conversion constants match the actual printer behavior and that the preview scaling faithfully reproduces printed dimensions. Adjust conversion factors if discrepancies are found between preview and physical printout measurements."
-        },
-        {
-          "path": "frontend/src/printing/barcodePreview.ts",
-          "operation": "modify",
-          "description": "Review the SVG barcode generation logic to ensure the deterministic bar pattern widths and spacing match the actual CODE128 barcode dimensions produced by the CPCL printer. Verify that the preview barcode's visual width corresponds to the estimated width used in layout calculations. Adjust bar widths or quiet zones if the preview does not visually match the printed barcode size."
+          "description": "Add duplicate serial detection logic to the scanning workflow. Track recently scanned serials (consider using a Set or array of recent scans, possibly stored in component state or a ref). When a serial is scanned, check if it matches any recently scanned serial. If a duplicate is detected, display a clear error message (e.g., 'Duplicate serial detected'), play the error sound from soundSystem, and prevent further processing or printing. Clear the input field automatically. Consider defining a reasonable time window or count for duplicate detection (e.g., last 10 scans or scans within the last session)."
         }
       ]
     }

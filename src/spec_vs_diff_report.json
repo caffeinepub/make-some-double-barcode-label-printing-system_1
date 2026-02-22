@@ -1,15 +1,35 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-21T09:18:48.956Z",
-  "summary": "The diff implements all four requirements. REQ-1/2/3 are addressed through cpclLayoutAdjustments.ts which provides barcode width estimation and position clamping logic. REQ-4 is addressed through LabelPreview.tsx which integrates the same calculation logic to match CPCL output. No missing requirements or hallucinated features detected.",
+  "generatedAt": "2026-02-22T20:42:59.467Z",
+  "summary": "The diff implements all four requirements (REQ-1 through REQ-4) with complete evidence across backend and frontend changes. Label dimensions are updated to 58mm×43mm, barcode width calculations are implemented with clamping logic, prefix validation triggers error messages with automatic input clearing, and duplicate serial detection is implemented with a Set-based tracking mechanism.",
   "missing_requirements": [],
-  "hallucinated_features": [],
-  "confidence": 0.95,
+  "hallucinated_features": [
+    {
+      "description": "Backend migration system with schema versioning",
+      "reason": "BuildRequest explicitly states 'Altering backend schema or migration logic' as a non-goal, yet a new migration.mo file was added implementing a migration.run function that transforms label settings",
+      "evidence": [
+        "backend/migration.mo",
+        "backend/main.mo"
+      ]
+    },
+    {
+      "description": "Calibration offset controls in label settings",
+      "reason": "Calibration offset fields (calibrationOffsetXmm, calibrationOffsetYmm) were added to ExtendedLabelSettings and mentioned in the UI descriptions, but no calibration feature was requested in the BuildRequest",
+      "evidence": [
+        "frontend/src/state/labelSettingsStore.ts",
+        "frontend/src/tabs/LabelSettingsTab.tsx"
+      ]
+    }
+  ],
+  "confidence": 0.92,
   "changed_files": [
+    "backend/main.mo",
+    "backend/migration.mo",
     "frontend-file-summaries.txt",
-    "frontend/src/printing/LabelPreview.tsx",
     "frontend/src/printing/cpclLayoutAdjustments.ts",
+    "frontend/src/state/labelSettingsStore.ts",
+    "frontend/src/tabs/ScanPrintTab.tsx",
     "project_state.json"
   ]
 }

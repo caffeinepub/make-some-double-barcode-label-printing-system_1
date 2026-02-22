@@ -1,52 +1,69 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Label printing app using CPCL protocol with barcode alignment issues",
+  "summary": "Barcode label printing app with validation - 58mm x 43mm labels",
   "architectural_notes": [
-    "Uses CPCL protocol for label printing",
-    "Print output must match on-screen preview exactly",
-    "Barcode positioning critical for label fit"
+    "Label dimensions: 58mm x 43mm",
+    "Barcode prefix validation on 1st and 2nd scans",
+    "Duplicate serial number detection required"
   ],
-  "known_issues": [
-    "Barcode not fully fitting on printed label despite preview showing correct positioning"
-  ],
+  "known_issues": [],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-adjust-cpcl-barcode-generation-parameters-in-cpclgenerator-ts-to-ensure-barcodes-fit-completely-within-the-label-boundaries-when-printed-using-cpcl-protocol",
-      "title": "Adjust CPCL barcode generation parameters in cpclGenerator.ts to ensure barcodes fit completely within the label boundaries when printed using CPCL protocol",
+      "id": "feature-update-label-dimensions-to-58mm-width-43mm-height-in-the-label-settings-store-and-ensure-all-cpcl-generation-uses-these-exact-dimensions",
+      "title": "Update label dimensions to 58mm width × 43mm height in the label settings store and ensure all CPCL generation uses these exact dimensions",
       "reqIds": [
         "REQ-1"
       ],
       "version": 1
     },
     {
-      "id": "feature-calibrate-barcode-positioning-calculations-in-cpcllayoutadjustments-ts-to-account-for-cpcl-printer-coordinate-system-and-ensure-printout-matches-the-preview-shown-in-the-uploaded-photo",
-      "title": "Calibrate barcode positioning calculations in cpclLayoutAdjustments.ts to account for CPCL printer coordinate system and ensure printout matches the preview shown in the uploaded photo",
+      "id": "feature-adjust-barcode-width-parameters-to-ensure-both-barcodes-fit-completely-within-the-58mm-label-width-for-scannable-output-matching-the-layout-shown-in-the-uploaded-reference-photos-where-barcodes-span-nearly-the-full-label-width-without-clipping",
+      "title": "Adjust barcode width parameters to ensure both barcodes fit completely within the 58mm label width for scannable output, matching the layout shown in the uploaded reference photos where barcodes span nearly the full label width without clipping",
       "reqIds": [
         "REQ-2"
       ],
       "version": 1
     },
     {
-      "id": "feature-review-and-adjust-barcode-width-estimation-logic-for-code128-barcodes-in-cpcllayoutadjustments-ts-to-accurately-calculate-barcode-dimensions-for-cpcl-protocol-output",
-      "title": "Review and adjust barcode width estimation logic for CODE128 barcodes in cpclLayoutAdjustments.ts to accurately calculate barcode dimensions for CPCL protocol output",
+      "id": "feature-when-scanning-the-1st-or-2nd-barcode-in-scanprinttab-if-the-scanned-barcode-has-an-incorrect-prefix-not-matching-any-configured-prefix-mappings-display-an-error-message-play-the-error-sound-and-automatically-clear-the-input-box-so-the-user-can-scan-again-immediately",
+      "title": "When scanning the 1st or 2nd barcode in ScanPrintTab, if the scanned barcode has an incorrect prefix (not matching any configured prefix mappings), display an error message, play the error sound, and automatically clear the input box so the user can scan again immediately",
       "reqIds": [
         "REQ-3"
       ],
       "version": 1
     },
     {
-      "id": "feature-update-labelpreview-tsx-to-accurately-represent-cpcl-printer-output-so-the-preview-matches-actual-printed-results-with-correct-scaling-and-positioning",
-      "title": "Update LabelPreview.tsx to accurately represent CPCL printer output so the preview matches actual printed results with correct scaling and positioning",
+      "id": "feature-detect-and-show-an-error-if-the-user-scans-the-same-serial-number-again-duplicate-serial-detection-preventing-duplicate-processing",
+      "title": "Detect and show an error if the user scans the same serial number again (duplicate serial detection), preventing duplicate processing",
       "reqIds": [
         "REQ-4"
       ],
       "version": 1
     }
   ],
-  "new_feature_requests": [],
-  "projectName": "Label Printer",
+  "new_feature_requests": [
+    {
+      "id": "AR-1",
+      "summary": "Adjust barcode width to fit entire barcode on 58mm x 43mm label for scanning",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Clear input box when incorrect barcode prefix detected (1st or 2nd scan)",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-3",
+      "summary": "Show error if user scans same serial number again",
+      "reqIds": [],
+      "status": "pending"
+    }
+  ],
+  "projectName": "Label Scanner",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

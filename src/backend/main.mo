@@ -9,7 +9,9 @@ import Int "mo:core/Int";
 
 import MixinAuthorization "authorization/MixinAuthorization";
 import AccessControl "authorization/access-control";
+import Migration "migration";
 
+(with migration = Migration.run)
 actor {
   public type PrefixMapping = {
     labelType : Text;
@@ -17,12 +19,19 @@ actor {
   };
 
   public type LayoutSettings = {
-    x : Int; // X position (mm)
-    y : Int; // Y position (mm)
-    scale : Float; // Element scale in percent (0.0 - 1.0)
+    x : Int;
+    y : Int;
+    scale : Float;
     width : Int;
     height : Int;
     fontSize : Nat;
+    verticalSpacing : Nat;
+  };
+
+  public type BarcodePosition = {
+    x : Int;
+    y : Int;
+    verticalSpacing : Nat;
   };
 
   public type LabelSettings = {
@@ -37,6 +46,10 @@ actor {
     serialText1Layout : LayoutSettings;
     barcode2Layout : LayoutSettings;
     serialText2Layout : LayoutSettings;
+    barcode1Position : BarcodePosition;
+    barcode2Position : BarcodePosition;
+    globalVerticalOffset : Nat;
+    globalHorizontalOffset : Nat;
   };
 
   public type PrintJob = {
@@ -86,7 +99,9 @@ actor {
   };
 
   public shared ({ caller }) func submitPrintJob(prefix : Text, leftSerial : Text, rightSerial : Text) : async Bool {
-    // Authorization removed
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can submit print jobs");
+    };
 
     if (usedSerials.get(leftSerial) == ?true) {
       Runtime.trap("Duplicate serial: leftSerial already used");
@@ -102,11 +117,18 @@ actor {
       width = 0;
       height = 0;
       fontSize = 12;
+      verticalSpacing = 0;
+    };
+
+    let defaultPosition : BarcodePosition = {
+      x = 0;
+      y = 0;
+      verticalSpacing = 0;
     };
 
     let defaultSettings : LabelSettings = {
-      widthMm = 50;
-      heightMm = 25;
+      widthMm = 58;
+      heightMm = 43;
       barcodeType = "CODE128";
       barcodeHeight = 10;
       spacing = 5;
@@ -116,6 +138,10 @@ actor {
       serialText1Layout = defaultLayout;
       barcode2Layout = defaultLayout;
       serialText2Layout = defaultLayout;
+      barcode1Position = defaultPosition;
+      barcode2Position = defaultPosition;
+      globalVerticalOffset = 0;
+      globalHorizontalOffset = 0;
     };
 
     let userSettings = switch (labelSettings.get(caller)) {
@@ -161,10 +187,16 @@ actor {
           width = 0;
           height = 0;
           fontSize = 12;
+          verticalSpacing = 0;
+        };
+        let defaultPosition : BarcodePosition = {
+          x = 0;
+          y = 0;
+          verticalSpacing = 0;
         };
         {
-          widthMm = 50;
-          heightMm = 25;
+          widthMm = 58;
+          heightMm = 43;
           barcodeType = "CODE128";
           barcodeHeight = 10;
           spacing = 5;
@@ -174,6 +206,10 @@ actor {
           serialText1Layout = defaultLayout;
           barcode2Layout = defaultLayout;
           serialText2Layout = defaultLayout;
+          barcode1Position = defaultPosition;
+          barcode2Position = defaultPosition;
+          globalVerticalOffset = 0;
+          globalHorizontalOffset = 0;
         };
       };
       case (?settings) { settings };
@@ -266,4 +302,3 @@ actor {
     };
   };
 };
-

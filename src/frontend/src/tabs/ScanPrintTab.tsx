@@ -45,6 +45,9 @@ export default function ScanPrintTab({ isActive }: ScanPrintTabProps) {
   const lastCompletedLeftRef = useRef<string>('');
   const lastCompletedRightRef = useRef<string>('');
   
+  // Track recently scanned serials for duplicate detection (last 100 scans)
+  const recentScansRef = useRef<Set<string>>(new Set());
+  
   const { isConnected, sendCPCL } = usePrinterService();
   const { settings } = useLabelSettings();
   const submitPrintJob = useSubmitPrintJob();
@@ -76,6 +79,22 @@ export default function ScanPrintTab({ isActive }: ScanPrintTabProps) {
     return null;
   };
 
+  const checkDuplicateSerial = (serial: string): boolean => {
+    return recentScansRef.current.has(serial);
+  };
+
+  const addToRecentScans = (serial: string) => {
+    recentScansRef.current.add(serial);
+    // Keep only last 100 scans
+    if (recentScansRef.current.size > 100) {
+      const iterator = recentScansRef.current.values();
+      const firstItem = iterator.next().value;
+      if (firstItem !== undefined) {
+        recentScansRef.current.delete(firstItem);
+      }
+    }
+  };
+
   const validateAndProcessLeftSerial = (value: string) => {
     // Normalize the serial (trim + remove scanner suffixes)
     const normalized = normalizeSerial(value);
@@ -97,24 +116,53 @@ export default function ScanPrintTab({ isActive }: ScanPrintTabProps) {
     const mapping = getPrefixMapping(normalized);
     if (!mapping) {
       setLeftValidation('error');
-      setErrorMessage('Unknown prefix');
+      setErrorMessage('Unknown prefix - scan again');
       playSound('error');
       addLog('error', `Unknown prefix in serial: ${normalized}`);
       incrementErrors();
-    } else {
-      setDetectedType(mapping.labelType);
-      setDetectedPrefix(mapping.prefix);
-      setLeftValidation('success');
-      playSound('success');
-      addLog('info', `Detected label type: ${mapping.labelType} (${mapping.title})`);
-      incrementScans();
-      incrementTypeScans(mapping.prefix, mapping.labelType);
       
-      // Move to step 2
+      // Clear input after showing error
       setTimeout(() => {
-        setStep(2);
-      }, 100);
+        setLeftSerial('');
+        setLeftValidation('idle');
+        setErrorMessage('');
+        lastCompletedLeftRef.current = '';
+        leftInputRef.current?.focus();
+      }, 1500);
+      return;
     }
+
+    // Check for duplicate serial
+    if (checkDuplicateSerial(normalized)) {
+      setLeftValidation('error');
+      setErrorMessage('Duplicate serial detected - scan again');
+      playSound('error');
+      addLog('error', `Duplicate serial detected: ${normalized}`);
+      incrementErrors();
+      
+      // Clear input after showing error
+      setTimeout(() => {
+        setLeftSerial('');
+        setLeftValidation('idle');
+        setErrorMessage('');
+        lastCompletedLeftRef.current = '';
+        leftInputRef.current?.focus();
+      }, 1500);
+      return;
+    }
+    
+    setDetectedType(mapping.labelType);
+    setDetectedPrefix(mapping.prefix);
+    setLeftValidation('success');
+    playSound('success');
+    addLog('info', `Detected label type: ${mapping.labelType} (${mapping.title})`);
+    incrementScans();
+    incrementTypeScans(mapping.prefix, mapping.labelType);
+    
+    // Move to step 2
+    setTimeout(() => {
+      setStep(2);
+    }, 100);
   };
 
   const validateAndProcessRightSerial = async (value: string) => {
@@ -144,10 +192,38 @@ export default function ScanPrintTab({ isActive }: ScanPrintTabProps) {
     
     if (!mapping) {
       setRightValidation('error');
-      setErrorMessage('Unknown prefix');
+      setErrorMessage('Unknown prefix - scan again');
       playSound('error');
       addLog('error', `Unknown prefix in serial: ${normalized}`);
       incrementErrors();
+      
+      // Clear input after showing error
+      setTimeout(() => {
+        setRightSerial('');
+        setRightValidation('idle');
+        setErrorMessage('');
+        lastCompletedRightRef.current = '';
+        rightInputRef.current?.focus();
+      }, 1500);
+      return;
+    }
+
+    // Check for duplicate serial
+    if (checkDuplicateSerial(normalized)) {
+      setRightValidation('error');
+      setErrorMessage('Duplicate serial detected - scan again');
+      playSound('error');
+      addLog('error', `Duplicate serial detected: ${normalized}`);
+      incrementErrors();
+      
+      // Clear input after showing error
+      setTimeout(() => {
+        setRightSerial('');
+        setRightValidation('idle');
+        setErrorMessage('');
+        lastCompletedRightRef.current = '';
+        rightInputRef.current?.focus();
+      }, 1500);
       return;
     }
     
@@ -190,7 +266,11 @@ export default function ScanPrintTab({ isActive }: ScanPrintTabProps) {
       // Step 2: Send CPCL to printer (critical path)
       await sendCPCL(cpcl);
       
-      // Step 3: Update local diagnostics and history (always succeeds)
+      // Step 3: Add serials to recent scans for duplicate detection
+      addToRecentScans(normalizedLeft);
+      addToRecentScans(normalized);
+      
+      // Step 4: Update local diagnostics and history (always succeeds)
       addPrintHistory({
         timestamp: Date.now(),
         prefix: detectedPrefix,
@@ -206,10 +286,10 @@ export default function ScanPrintTab({ isActive }: ScanPrintTabProps) {
       playSound('printComplete');
       addLog('info', `Print completed: ${normalizedLeft} / ${normalized}`);
       
-      // Step 4: Immediately reset for next scan (no delay)
+      // Step 5: Immediately reset for next scan (no delay)
       resetForm();
       
-      // Step 5: Best-effort backend submission (fire-and-forget, non-blocking)
+      // Step 6: Best-effort backend submission (fire-and-forget, non-blocking)
       submitPrintJob.mutateAsync({
         prefix: detectedPrefix,
         leftSerial: normalizedLeft,
