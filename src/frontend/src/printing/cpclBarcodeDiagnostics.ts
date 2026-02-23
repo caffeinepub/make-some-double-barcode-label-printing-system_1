@@ -1,18 +1,8 @@
 /**
- * CPCL barcode diagnostics and validation utilities
- * 
- * Provides structured validation and diagnostic logging for barcode
- * generation to help users troubleshoot printing issues.
+ * Barcode validation and diagnostic logging utilities
  */
 
 import { addLog } from '../state/logStore';
-import type { LabelSettings as BackendLabelSettings } from '../backend';
-
-export interface BarcodeValidationResult {
-  isValid: boolean;
-  warnings: string[];
-  errors: string[];
-}
 
 /**
  * Validate barcode data for common issues
@@ -21,107 +11,89 @@ export function validateBarcodeData(
   data: string,
   barcodeType: string,
   barcodeIndex: 1 | 2
-): BarcodeValidationResult {
-  const result: BarcodeValidationResult = {
-    isValid: true,
-    warnings: [],
-    errors: [],
-  };
-
-  // Check for empty data
-  if (!data || data.trim().length === 0) {
-    result.isValid = false;
-    result.errors.push(`Barcode ${barcodeIndex}: Empty barcode data`);
+): void {
+  if (!data || data.length === 0) {
     addLog('error', `Barcode ${barcodeIndex} has empty data`, {
       category: 'barcode',
       barcodeIndex,
       reasonCode: 'EMPTY_DATA',
     });
-    return result;
+    return;
   }
 
-  // Check for whitespace
-  if (data !== data.trim()) {
-    result.warnings.push(`Barcode ${barcodeIndex}: Data contains leading/trailing whitespace`);
-    addLog('warn', `Barcode ${barcodeIndex} data contains whitespace: "${data}"`, {
-      category: 'barcode',
-      barcodeIndex,
-      reasonCode: 'WHITESPACE',
-    });
-  }
-
-  // Check for special characters that might cause issues
-  const problematicChars = /[\r\n\t]/g;
-  if (problematicChars.test(data)) {
-    result.warnings.push(`Barcode ${barcodeIndex}: Data contains control characters (CR/LF/Tab)`);
+  // Check for invalid characters (control characters, etc.)
+  const hasInvalidChars = /[\x00-\x1F\x7F]/.test(data);
+  if (hasInvalidChars) {
     addLog('warn', `Barcode ${barcodeIndex} contains control characters`, {
       category: 'barcode',
       barcodeIndex,
-      reasonCode: 'CONTROL_CHARS',
+      reasonCode: 'INVALID_CHARS',
+      data,
     });
   }
 
-  return result;
+  // Warn if data is very long (may not fit on label)
+  if (data.length > 20) {
+    addLog('warn', `Barcode ${barcodeIndex} data is very long (${data.length} chars), may not fit on label`, {
+      category: 'barcode',
+      barcodeIndex,
+      reasonCode: 'DATA_TOO_LONG',
+      dataLength: data.length,
+    });
+  }
 }
 
 /**
- * Validate barcode positioning against label bounds
+ * Validate barcode position is within label bounds
  */
 export function validateBarcodePosition(
   x: number,
   y: number,
   height: number,
-  labelWidthDots: number,
-  labelHeightDots: number,
+  labelWidth: number,
+  labelHeight: number,
   barcodeIndex: 1 | 2
-): BarcodeValidationResult {
-  const result: BarcodeValidationResult = {
-    isValid: true,
-    warnings: [],
-    errors: [],
-  };
-
-  // Check if barcode is within label bounds
-  if (x < 0 || x >= labelWidthDots) {
-    result.warnings.push(`Barcode ${barcodeIndex}: X position ${x} is outside label width ${labelWidthDots}`);
-    addLog('warn', `Barcode ${barcodeIndex} X position out of bounds`, {
+): void {
+  // Check if barcode starts outside label
+  if (x < 0 || y < 0) {
+    addLog('error', `Barcode ${barcodeIndex} position is negative: x=${x}, y=${y}`, {
       category: 'barcode',
       barcodeIndex,
-      reasonCode: 'X_OUT_OF_BOUNDS',
-      computedValue: x,
-      clampedValue: Math.max(0, Math.min(x, labelWidthDots - 1)),
+      reasonCode: 'NEGATIVE_POSITION',
+      x,
+      y,
     });
   }
 
-  if (y < 0 || y >= labelHeightDots) {
-    result.warnings.push(`Barcode ${barcodeIndex}: Y position ${y} is outside label height ${labelHeightDots}`);
-    addLog('warn', `Barcode ${barcodeIndex} Y position out of bounds`, {
+  // Check if barcode extends beyond label height
+  if (y + height > labelHeight) {
+    addLog('warn', `Barcode ${barcodeIndex} extends beyond label height: y=${y}, height=${height}, labelHeight=${labelHeight}`, {
       category: 'barcode',
       barcodeIndex,
-      reasonCode: 'Y_OUT_OF_BOUNDS',
-      computedValue: y,
-      clampedValue: Math.max(0, Math.min(y, labelHeightDots - 1)),
+      reasonCode: 'EXCEEDS_HEIGHT',
+      y,
+      height,
+      labelHeight,
+      overflow: (y + height) - labelHeight,
     });
   }
 
-  if (y + height > labelHeightDots) {
-    result.warnings.push(
-      `Barcode ${barcodeIndex}: Height ${height} extends beyond label (y=${y}, label height=${labelHeightDots})`
-    );
-    addLog('warn', `Barcode ${barcodeIndex} extends beyond label height`, {
+  // Check if barcode X position is near label edge (width check is done by clamp function)
+  const rightEdge = labelWidth;
+  const minMargin = 8; // dots
+  if (x < minMargin) {
+    addLog('warn', `Barcode ${barcodeIndex} is very close to left edge: x=${x}`, {
       category: 'barcode',
       barcodeIndex,
-      reasonCode: 'HEIGHT_OVERFLOW',
-      computedValue: y + height,
-      clampedValue: labelHeightDots,
+      reasonCode: 'NEAR_LEFT_EDGE',
+      x,
+      minMargin,
     });
   }
-
-  return result;
 }
 
 /**
- * Validate barcode height calculation
+ * Validate barcode height is reasonable
  */
 export function validateBarcodeHeight(
   heightMm: number,
@@ -129,25 +101,31 @@ export function validateBarcodeHeight(
   heightDots: number,
   barcodeIndex: 1 | 2
 ): void {
-  if (heightDots <= 0 || !isFinite(heightDots)) {
-    addLog('error', `Barcode ${barcodeIndex} computed height is invalid`, {
-      category: 'barcode',
-      barcodeIndex,
-      reasonCode: 'INVALID_HEIGHT',
-      computedValue: heightDots,
-    });
-  } else if (heightDots < 30) {
-    addLog('warn', `Barcode ${barcodeIndex} height ${heightDots} dots may be too small to scan reliably`, {
+  // Minimum scannable height is typically 5mm
+  const minHeightMm = 5;
+  const actualHeightMm = heightMm * scale;
+
+  if (actualHeightMm < minHeightMm) {
+    addLog('warn', `Barcode ${barcodeIndex} height may be too small for reliable scanning: ${actualHeightMm.toFixed(1)}mm (minimum recommended: ${minHeightMm}mm)`, {
       category: 'barcode',
       barcodeIndex,
       reasonCode: 'HEIGHT_TOO_SMALL',
-      computedValue: heightDots,
+      heightMm: actualHeightMm,
+      minHeightMm,
+      heightDots,
     });
-  } else {
-    addLog('info', `Barcode ${barcodeIndex} height: ${heightDots} dots (${heightMm}mm × ${scale})`, {
+  }
+
+  // Maximum practical height for 43mm label
+  const maxHeightMm = 15;
+  if (actualHeightMm > maxHeightMm) {
+    addLog('warn', `Barcode ${barcodeIndex} height is very large: ${actualHeightMm.toFixed(1)}mm (may not fit on 43mm label)`, {
       category: 'barcode',
       barcodeIndex,
-      computedValue: heightDots,
+      reasonCode: 'HEIGHT_TOO_LARGE',
+      heightMm: actualHeightMm,
+      maxHeightMm,
+      heightDots,
     });
   }
 }
@@ -167,12 +145,7 @@ export function logBarcodeGeneration(
   data: string,
   wasFallback: boolean
 ): void {
-  const level = wasFallback ? 'warn' : 'info';
-  const message = wasFallback
-    ? `Barcode ${barcodeIndex}: Using fallback type ${cpclToken} (requested: ${uiType})`
-    : `Barcode ${barcodeIndex}: Generated ${cpclToken} barcode`;
-
-  addLog(level, message, {
+  addLog('info', `Generated Barcode ${barcodeIndex}: ${cpclToken} at (${x}, ${y}) with height ${height} dots`, {
     category: 'barcode',
     barcodeIndex,
     uiType,

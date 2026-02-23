@@ -29,7 +29,8 @@ export function calculateLeftAlignedBarcodeX(
   barcodeIndex: 1 | 2
 ): BarcodeAdjustment {
   // Define minimum margins (in dots) to prevent edge clipping
-  const minMargin = 3; // ~0.37mm at 203 DPI - minimal margin for maximum barcode width
+  // Increased from 3 to 8 dots (~1mm at 203 DPI) for better safety margin
+  const minMargin = 8;
   
   // Clamp to ensure barcode stays within safe printable area
   const minX = minMargin;
@@ -74,7 +75,7 @@ export function calculateLeftAlignedBarcodeX(
  * - Quiet zones: 10 modules each side
  * - Module width: 2 dots (narrow bar)
  * 
- * Updated for 58mm label width to maximize barcode width while ensuring scannability.
+ * Updated with more conservative estimation to prevent barcode clipping.
  * 
  * @param dataLength - Length of barcode data string
  * @param width - CPCL width parameter (narrow bar width in dots)
@@ -108,5 +109,9 @@ export function estimateBarcodeWidthDots(
   const ratioMultiplier = 2.0 + (ratio * 0.5); // 0→2.0, 1→2.5, 2→3.0
   const avgModuleWidth = width * (1 + ratioMultiplier) / 2;
   
-  return Math.ceil(totalModules * avgModuleWidth);
+  // Add 10% safety margin to account for printer variations
+  const estimatedWidth = totalModules * avgModuleWidth;
+  const safetyMargin = 1.1;
+  
+  return Math.ceil(estimatedWidth * safetyMargin);
 }

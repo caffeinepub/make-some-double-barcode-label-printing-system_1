@@ -1,77 +1,74 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-22T20:42:59.470Z",
+  "generatedAt": "2026-02-23T16:37:47.715Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 4,
-    "implemented": 4,
+    "total": 3,
+    "implemented": 3,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Update label dimensions to 58mm width × 43mm height in the label settings store and ensure all CPCL generation uses these exact dimensions",
+        "summary": "Fix label layout to prevent text and barcode from overlapping on printed labels",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/state/labelSettingsStore.ts",
           "frontend/src/printing/cpclGenerator.ts",
           "frontend/src/printing/LabelPreview.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/state/labelSettingsStore.ts"
+          "frontend/src/printing/cpclGenerator.ts",
+          "frontend/src/printing/LabelPreview.tsx"
         ]
       },
       {
         "id": "REQ-2",
-        "summary": "Adjust barcode width parameters to ensure both barcodes fit completely within the 58mm label width for scannable output, matching the layout shown in the uploaded reference photos where barcodes span nearly the full label width without clipping",
+        "summary": "Ensure the complete barcode is visible and scannable on the 58mm × 43mm label",
         "status": "implemented",
         "plannedFiles": [
           "frontend/src/printing/cpclLayoutAdjustments.ts",
           "frontend/src/printing/cpclGenerator.ts",
-          "frontend/src/printing/LabelPreview.tsx",
-          "frontend/src/state/labelSettingsStore.ts"
+          "frontend/src/printing/cpclBarcodeDiagnostics.ts",
+          "frontend/src/printing/LabelPreview.tsx"
         ],
         "matchedFiles": [
           "frontend/src/printing/cpclLayoutAdjustments.ts",
-          "frontend/src/state/labelSettingsStore.ts"
+          "frontend/src/printing/cpclGenerator.ts",
+          "frontend/src/printing/cpclBarcodeDiagnostics.ts",
+          "frontend/src/printing/LabelPreview.tsx"
         ]
       },
       {
         "id": "REQ-3",
-        "summary": "When scanning the 1st or 2nd barcode in ScanPrintTab, if the scanned barcode has an incorrect prefix (not matching any configured prefix mappings), display an error message, play the error sound, and automatically clear the input box so the user can scan again immediately",
+        "summary": "Adjust CPCL generation logic to properly position text and barcode elements with sufficient spacing",
         "status": "implemented",
         "plannedFiles": [
-          "frontend/src/tabs/ScanPrintTab.tsx"
+          "frontend/src/printing/cpclGenerator.ts",
+          "frontend/src/state/labelSettingsStore.ts",
+          "frontend/src/utils/barcodeSettingsValidation.ts",
+          "frontend/src/tabs/LabelSettingsTab.tsx"
         ],
         "matchedFiles": [
-          "frontend/src/tabs/ScanPrintTab.tsx"
-        ]
-      },
-      {
-        "id": "REQ-4",
-        "summary": "Detect and show an error if the user scans the same serial number again (duplicate serial detection), preventing duplicate processing",
-        "status": "implemented",
-        "plannedFiles": [
-          "frontend/src/tabs/ScanPrintTab.tsx"
-        ],
-        "matchedFiles": [
-          "frontend/src/tabs/ScanPrintTab.tsx"
+          "frontend/src/printing/cpclGenerator.ts",
+          "frontend/src/state/labelSettingsStore.ts",
+          "frontend/src/utils/barcodeSettingsValidation.ts"
         ]
       }
     ]
   },
   "changedFiles": [
-    "backend/main.mo",
-    "backend/migration.mo",
     "build-request.json",
     "feature_evidence.json",
     "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
+    "frontend/src/printing/LabelPreview.tsx",
+    "frontend/src/printing/cpclBarcodeDiagnostics.ts",
+    "frontend/src/printing/cpclGenerator.ts",
     "frontend/src/printing/cpclLayoutAdjustments.ts",
     "frontend/src/state/labelSettingsStore.ts",
-    "frontend/src/tabs/ScanPrintTab.tsx",
+    "frontend/src/utils/barcodeSettingsValidation.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

@@ -1,35 +1,48 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-22T20:42:59.467Z",
-  "summary": "The diff implements all four requirements (REQ-1 through REQ-4) with complete evidence across backend and frontend changes. Label dimensions are updated to 58mm×43mm, barcode width calculations are implemented with clamping logic, prefix validation triggers error messages with automatic input clearing, and duplicate serial detection is implemented with a Set-based tracking mechanism.",
+  "generatedAt": "2026-02-23T16:37:47.712Z",
+  "summary": "All three requirements have been implemented. The diff introduces comprehensive barcode positioning and validation logic to prevent overlap and clipping, adjusts CPCL generation with proper spacing calculations, and includes diagnostic utilities to ensure barcode visibility within the 58mm × 43mm label boundaries.",
   "missing_requirements": [],
   "hallucinated_features": [
     {
-      "description": "Backend migration system with schema versioning",
-      "reason": "BuildRequest explicitly states 'Altering backend schema or migration logic' as a non-goal, yet a new migration.mo file was added implementing a migration.run function that transforms label settings",
+      "description": "Barcode diagnostics and validation logging system (cpclBarcodeDiagnostics.ts)",
+      "reason": "The BuildRequest did not ask for a diagnostic logging system with structured metadata, reasonCode tracking, or validation warnings. It only requested fixing the layout to prevent overlap and ensure visibility.",
       "evidence": [
-        "backend/migration.mo",
-        "backend/main.mo"
+        "frontend/src/printing/cpclBarcodeDiagnostics.ts"
       ]
     },
     {
-      "description": "Calibration offset controls in label settings",
-      "reason": "Calibration offset fields (calibrationOffsetXmm, calibrationOffsetYmm) were added to ExtendedLabelSettings and mentioned in the UI descriptions, but no calibration feature was requested in the BuildRequest",
+      "description": "Test print CPCL generation function",
+      "reason": "The BuildRequest constraints explicitly stated 'Non-goals: Modifying printer communication protocol' and did not request test print functionality.",
       "evidence": [
-        "frontend/src/state/labelSettingsStore.ts",
-        "frontend/src/tabs/LabelSettingsTab.tsx"
+        "frontend/src/printing/cpclGenerator.ts"
+      ]
+    },
+    {
+      "description": "Calibration pattern CPCL generation function",
+      "reason": "While the constraint mentions 'Keep calibration offset functionality intact', the BuildRequest did not ask for new calibration pattern generation. The constraint was about preserving existing calibration, not adding new calibration features.",
+      "evidence": [
+        "frontend/src/printing/cpclGenerator.ts"
+      ]
+    },
+    {
+      "description": "Barcode settings validation utility with comprehensive checks",
+      "reason": "The BuildRequest did not ask for a separate validation utility that checks scale, height, overlap, and boundary constraints. It requested fixing the layout logic itself, not adding pre-flight validation.",
+      "evidence": [
+        "frontend/src/utils/barcodeSettingsValidation.ts"
       ]
     }
   ],
-  "confidence": 0.92,
+  "confidence": 0.85,
   "changed_files": [
-    "backend/main.mo",
-    "backend/migration.mo",
     "frontend-file-summaries.txt",
+    "frontend/src/printing/LabelPreview.tsx",
+    "frontend/src/printing/cpclBarcodeDiagnostics.ts",
+    "frontend/src/printing/cpclGenerator.ts",
     "frontend/src/printing/cpclLayoutAdjustments.ts",
     "frontend/src/state/labelSettingsStore.ts",
-    "frontend/src/tabs/ScanPrintTab.tsx",
+    "frontend/src/utils/barcodeSettingsValidation.ts",
     "project_state.json"
   ]
 }

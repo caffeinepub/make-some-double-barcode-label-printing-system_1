@@ -1,98 +1,72 @@
 {
   "kind": "build_request",
-  "title": "Fix label dimensions, barcode width, and scanning validation",
-  "projectName": "Label Scanner",
+  "title": "Fix label layout: prevent text and barcode overlap, ensure full barcode visibility",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Update label dimensions to 58mm width × 43mm height in the label settings store and ensure all CPCL generation uses these exact dimensions",
-      "target": "both",
+      "text": "Fix label layout to prevent text and barcode from overlapping on printed labels",
+      "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-last"
+          "msg-latest"
         ],
         "quotes": [
-          "Label size us 58mx43mm"
+          "Text and barcode going on top of each other"
         ]
       },
       "acceptanceCriteria": [
-        "Label settings store default dimensions are set to 58mm × 43mm",
-        "CPCL generator uses 58mm × 43mm for label boundaries",
-        "Label preview displays 58mm × 43mm dimensions"
+        "Text elements (prefix, serial number) do not overlap with barcode elements",
+        "All text remains fully readable without obstruction",
+        "Layout adjustments maintain proper spacing between text and barcode"
       ]
     },
     {
       "id": "REQ-2",
-      "text": "Adjust barcode width parameters to ensure both barcodes fit completely within the 58mm label width for scannable output, matching the layout shown in the uploaded reference photos where barcodes span nearly the full label width without clipping",
+      "text": "Ensure the complete barcode is visible and scannable on the 58mm × 43mm label",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-last"
+          "msg-latest"
         ],
         "quotes": [
-          "just change barcode width to make sure whole barcode is fit on label so can be scanned",
-          "Make sure label look like on that photo"
+          "Can't scan barcode from label as whole barcode is not visible"
         ]
       },
       "acceptanceCriteria": [
-        "Both barcodes fit within 58mm label width with no clipping",
-        "Barcode width is adjusted in CPCL generation to maximize width while staying within boundaries",
-        "Generated labels match the visual layout of the reference photos (1771682557066499855940811118309.jpg, image-11.png, 17717694923414593234117505414352.jpg, image-12.png)",
-        "Printed barcodes are scannable without manual adjustment"
+        "Entire barcode prints within the label boundaries",
+        "No barcode clipping occurs at edges",
+        "Barcode remains scannable with standard barcode readers",
+        "Barcode width and positioning fit within the 58mm label width"
       ]
     },
     {
       "id": "REQ-3",
-      "text": "When scanning the 1st or 2nd barcode in ScanPrintTab, if the scanned barcode has an incorrect prefix (not matching any configured prefix mappings), display an error message, play the error sound, and automatically clear the input box so the user can scan again immediately",
+      "text": "Adjust CPCL generation logic to properly position text and barcode elements with sufficient spacing",
       "target": "frontend",
       "source": {
         "messageIds": [
-          "msg-last"
-        ],
-        "quotes": [
-          "When scanning 1st or 2nd barcode and if barcode got incorrect prefix except show error and making sound clear the box so can be scanned again"
+          "msg-latest"
         ]
       },
       "acceptanceCriteria": [
-        "Error message displays when scanned barcode prefix does not match any configured prefix mapping",
-        "Error sound plays when incorrect prefix detected",
-        "Input box is cleared automatically after showing error",
-        "User can immediately scan again without manual intervention",
-        "Validation applies to both first and second barcode scans"
-      ]
-    },
-    {
-      "id": "REQ-4",
-      "text": "Detect and show an error if the user scans the same serial number again (duplicate serial detection), preventing duplicate processing",
-      "target": "frontend",
-      "source": {
-        "messageIds": [
-          "msg-last"
-        ],
-        "quotes": [
-          "Is user scan same serial again show error"
-        ]
-      },
-      "acceptanceCriteria": [
-        "System detects when the same serial number is scanned twice",
-        "Error message displays clearly indicating duplicate serial",
-        "Duplicate serial is not processed or printed",
-        "Error sound plays on duplicate detection"
+        "CPCL commands position text above or below barcode with adequate margins",
+        "Barcode Y-position adjusted to prevent overlap with text elements",
+        "Generated CPCL produces cleanly separated text and barcode sections"
       ]
     }
   ],
   "constraints": [
-    "Maintain existing barcode validation and prefix mapping logic",
-    "Do not modify authentication or Internet Identity integration",
-    "Preserve existing label settings import/export functionality",
-    "Keep single-actor backend architecture"
+    "Maintain 58mm × 43mm label dimensions",
+    "Preserve existing barcode type support (CODE128, EAN13, CODE39, etc.)",
+    "Do not modify backend main.mo or migration.mo",
+    "Keep calibration offset functionality intact"
   ],
   "nonGoals": [
-    "Changing label type definitions (Dual Band, Tri Band, New Dual Band)",
-    "Modifying printer connection or USB transport logic",
-    "Altering backend schema or migration logic",
-    "Adding new barcode types beyond existing supported types"
+    "Changing label physical dimensions",
+    "Adding new barcode types",
+    "Modifying printer communication protocol",
+    "Redesigning the preview UI"
   ],
   "imageRequirements": {
     "required": [],

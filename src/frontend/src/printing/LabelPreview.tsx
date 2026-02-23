@@ -39,7 +39,7 @@ export default function LabelPreview({
   const calibrationOffsetXmm = extendedSettings.calibrationOffsetXmm ?? 0;
   const calibrationOffsetYmm = extendedSettings.calibrationOffsetYmm ?? 0;
   
-  // Use authoritative mm-to-px conversion for true 48x30mm sizing
+  // Use authoritative mm-to-px conversion for true 58x43mm sizing
   const widthPx = mmToPx(widthMm);
   const heightPx = mmToPx(heightMm);
   const widthDots = mmToDots(widthMm);
@@ -96,10 +96,11 @@ export default function LabelPreview({
   };
   const barcode1Px = layoutToPx(barcode1PositionLayout, sampleSerial1, 1);
   
-  // Serial 1 positioned below barcode 1 using verticalSpacing
+  // Serial 1 positioned below barcode 1 using verticalSpacing (minimum 1mm)
+  const minTextSpacing1 = Math.max(Number(settings.barcode1Position.verticalSpacing), 1);
   const serial1PositionLayout = {
     x: settings.barcode1Position.x,
-    y: BigInt(Number(settings.barcode1Position.y) + barcode1HeightMm + Number(settings.barcode1Position.verticalSpacing)),
+    y: BigInt(Number(settings.barcode1Position.y) + barcode1HeightMm + minTextSpacing1),
     width: settings.serialText1Layout.width,
     height: settings.serialText1Layout.height,
     fontSize: settings.serialText1Layout.fontSize,
@@ -119,10 +120,11 @@ export default function LabelPreview({
   };
   const barcode2Px = layoutToPx(barcode2PositionLayout, sampleSerial2, 2);
   
-  // Serial 2 positioned below barcode 2 using verticalSpacing
+  // Serial 2 positioned below barcode 2 using verticalSpacing (minimum 1mm)
+  const minTextSpacing2 = Math.max(Number(settings.barcode2Position.verticalSpacing), 1);
   const serial2PositionLayout = {
     x: settings.barcode2Position.x,
-    y: BigInt(Number(settings.barcode2Position.y) + barcode2HeightMm + Number(settings.barcode2Position.verticalSpacing)),
+    y: BigInt(Number(settings.barcode2Position.y) + barcode2HeightMm + minTextSpacing2),
     width: settings.serialText2Layout.width,
     height: settings.serialText2Layout.height,
     fontSize: settings.serialText2Layout.fontSize,
@@ -234,7 +236,7 @@ export default function LabelPreview({
             transformOrigin: 'center center',
           }}
         >
-          {/* Label Canvas - true 48x30mm size at 100% zoom */}
+          {/* Label Canvas - true 58x43mm size at 100% zoom */}
           <div
             className="bg-white border-2 border-gray-400 relative shadow-lg"
             style={{
@@ -319,8 +321,9 @@ export default function LabelPreview({
 
       {/* Help Text */}
       <div className="text-xs text-muted-foreground space-y-1">
-        <p>• Preview shows exactly how the label will print (true 48×30mm at 100% zoom)</p>
+        <p>• Preview shows exactly how the label will print (true 58×43mm at 100% zoom)</p>
         <p>• Barcodes are positioned with minimal margins to prevent clipping</p>
+        <p>• Text elements have minimum 1mm spacing from barcodes to prevent overlap</p>
         <p>• Edit sample serials above to see different barcodes</p>
         <p>• Adjust settings below to customize layout</p>
       </div>

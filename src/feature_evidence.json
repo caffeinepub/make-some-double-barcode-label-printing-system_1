@@ -2,10 +2,11 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-update-label-dimensions-to-58mm-width-43mm-height-in-the-label-settings-store-and-ensure-all-cpcl-generation-uses-these-exact-dimensions",
-      "featureTitle": "Update label dimensions to 58mm width × 43mm height in the label settings store and ensure all CPCL generation uses these exact dimensions",
+      "featureId": "feature-fix-label-layout-to-prevent-text-and-barcode-from-overlapping-on-printed-labels",
+      "featureTitle": "Fix label layout to prevent text and barcode from overlapping on printed labels",
       "files": [
-        "frontend/src/state/labelSettingsStore.ts"
+        "frontend/src/printing/LabelPreview.tsx",
+        "frontend/src/printing/cpclGenerator.ts"
       ],
       "components": [
         "authorization@4.0.0",
@@ -21,11 +22,13 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-adjust-barcode-width-parameters-to-ensure-both-barcodes-fit-completely-within-the-58mm-label-width-for-scannable-output-matching-the-layout-shown-in-the-uploaded-reference-photos-where-barcodes-span-nearly-the-full-label-width-without-clipping",
-      "featureTitle": "Adjust barcode width parameters to ensure both barcodes fit completely within the 58mm label width for scannable output, matching the layout shown in the uploaded reference photos where barcodes span nearly the full label width without clipping",
+      "featureId": "feature-ensure-the-complete-barcode-is-visible-and-scannable-on-the-58mm-43mm-label",
+      "featureTitle": "Ensure the complete barcode is visible and scannable on the 58mm × 43mm label",
       "files": [
-        "frontend/src/printing/cpclLayoutAdjustments.ts",
-        "frontend/src/state/labelSettingsStore.ts"
+        "frontend/src/printing/LabelPreview.tsx",
+        "frontend/src/printing/cpclBarcodeDiagnostics.ts",
+        "frontend/src/printing/cpclGenerator.ts",
+        "frontend/src/printing/cpclLayoutAdjustments.ts"
       ],
       "components": [
         "authorization@4.0.0",
@@ -41,10 +44,12 @@
       "confidence": "high"
     },
     {
-      "featureId": "feature-when-scanning-the-1st-or-2nd-barcode-in-scanprinttab-if-the-scanned-barcode-has-an-incorrect-prefix-not-matching-any-configured-prefix-mappings-display-an-error-message-play-the-error-sound-and-automatically-clear-the-input-box-so-the-user-can-scan-again-immediately",
-      "featureTitle": "When scanning the 1st or 2nd barcode in ScanPrintTab, if the scanned barcode has an incorrect prefix (not matching any configured prefix mappings), display an error message, play the error sound, and automatically clear the input box so the user can scan again immediately",
+      "featureId": "feature-adjust-cpcl-generation-logic-to-properly-position-text-and-barcode-elements-with-sufficient-spacing",
+      "featureTitle": "Adjust CPCL generation logic to properly position text and barcode elements with sufficient spacing",
       "files": [
-        "frontend/src/tabs/ScanPrintTab.tsx"
+        "frontend/src/printing/cpclGenerator.ts",
+        "frontend/src/state/labelSettingsStore.ts",
+        "frontend/src/utils/barcodeSettingsValidation.ts"
       ],
       "components": [
         "authorization@4.0.0",
@@ -56,25 +61,6 @@
       ],
       "testIds": [
         "REQ-3"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-detect-and-show-an-error-if-the-user-scans-the-same-serial-number-again-duplicate-serial-detection-preventing-duplicate-processing",
-      "featureTitle": "Detect and show an error if the user scans the same serial number again (duplicate serial detection), preventing duplicate processing",
-      "files": [
-        "frontend/src/tabs/ScanPrintTab.tsx"
-      ],
-      "components": [
-        "authorization@4.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0"
-      ],
-      "testIds": [
-        "REQ-4"
       ],
       "confidence": "high"
     }

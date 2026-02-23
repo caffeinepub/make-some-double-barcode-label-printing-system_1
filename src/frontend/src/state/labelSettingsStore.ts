@@ -32,9 +32,10 @@ const createDefaultBarcodePosition = (x: number, y: number, verticalSpacing: num
   verticalSpacing: BigInt(verticalSpacing),
 });
 
-// Updated default settings for 58mm × 43mm label matching reference photo layout:
-// - Primary barcode at top (y=2mm) with serial text 1mm below
-// - Secondary barcode in middle (y=14mm) with serial text 1mm below
+// Updated default settings for 58mm × 43mm label with improved spacing:
+// - Title at top (y=1mm) with adequate space before first barcode
+// - Primary barcode at y=6mm (5mm below title) with serial text 2mm below
+// - Secondary barcode at y=20mm with serial text 2mm below
 const defaultSettings: ExtendedLabelSettings = {
   widthMm: BigInt(58),
   heightMm: BigInt(43),
@@ -42,16 +43,16 @@ const defaultSettings: ExtendedLabelSettings = {
   barcodeHeight: BigInt(8),
   spacing: BigInt(3),
   prefixMappings: [],
-  // Title at top
+  // Title at top with space below
   titleLayout: createDefaultLayout(2, 1, 54, 4, 10, 0),
   // Barcode layouts (kept for backward compatibility but positions control actual placement)
-  barcode1Layout: createDefaultLayout(2, 2, 54, 8, 8, 0),
-  serialText1Layout: createDefaultLayout(2, 11, 54, 2, 7, 0),
-  barcode2Layout: createDefaultLayout(2, 14, 54, 8, 8, 0),
-  serialText2Layout: createDefaultLayout(2, 23, 54, 2, 7, 0),
-  // Barcode positions - these control actual placement
-  barcode1Position: createDefaultBarcodePosition(2, 2, 1),  // Top barcode, 1mm spacing to text
-  barcode2Position: createDefaultBarcodePosition(2, 14, 1), // Middle barcode, 1mm spacing to text
+  barcode1Layout: createDefaultLayout(2, 6, 54, 8, 8, 0),
+  serialText1Layout: createDefaultLayout(2, 16, 54, 2, 7, 0),
+  barcode2Layout: createDefaultLayout(2, 20, 54, 8, 8, 0),
+  serialText2Layout: createDefaultLayout(2, 30, 54, 2, 7, 0),
+  // Barcode positions - these control actual placement with improved spacing
+  barcode1Position: createDefaultBarcodePosition(2, 6, 2),  // Top barcode, 2mm spacing to text
+  barcode2Position: createDefaultBarcodePosition(2, 20, 2), // Middle barcode, 2mm spacing to text
   // Global offsets
   globalVerticalOffset: BigInt(0),
   globalHorizontalOffset: BigInt(0),
@@ -107,18 +108,21 @@ function migrateSettings(settings: any, version: number): ExtendedLabelSettings 
       ...settings,
       widthMm: BigInt(58),
       heightMm: BigInt(43),
-      barcode1Position: settings.barcode1Position || createDefaultBarcodePosition(2, 2, 1),
-      barcode2Position: settings.barcode2Position || createDefaultBarcodePosition(2, 14, 1),
+      barcode1Position: settings.barcode1Position || createDefaultBarcodePosition(2, 6, 2),
+      barcode2Position: settings.barcode2Position || createDefaultBarcodePosition(2, 20, 2),
       calibrationOffsetXmm: settings.calibrationOffsetXmm ?? 0,
       calibrationOffsetYmm: settings.calibrationOffsetYmm ?? 0,
     } as ExtendedLabelSettings;
   }
 
   // Ensure calibration offsets exist and update dimensions to 58×43
+  // Also update barcode positions to new defaults with better spacing
   return {
     ...settings,
     widthMm: BigInt(58),
     heightMm: BigInt(43),
+    barcode1Position: createDefaultBarcodePosition(2, 6, 2),
+    barcode2Position: createDefaultBarcodePosition(2, 20, 2),
     calibrationOffsetXmm: settings.calibrationOffsetXmm ?? 0,
     calibrationOffsetYmm: settings.calibrationOffsetYmm ?? 0,
   } as ExtendedLabelSettings;
@@ -134,10 +138,10 @@ export const useLabelSettings = create<LabelSettingsState>()(
     {
       name: 'label-settings',
       storage: createJSONStorage(() => bigIntStorage),
-      version: 6, // Bumped to 6 for 58×43mm dimensions
+      version: 7, // Bumped to 7 for improved spacing
       migrate: (persistedState: any, version: number) => {
-        if (version < 6) {
-          // Migrate old settings to include barcode positions and new dimensions
+        if (version < 7) {
+          // Migrate old settings to include improved barcode positions and spacing
           const migratedSettings = persistedState.settings
             ? migrateSettings(persistedState.settings, version)
             : defaultSettings;

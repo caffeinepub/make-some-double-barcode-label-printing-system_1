@@ -1,98 +1,89 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix label dimensions, barcode width, and scanning validation",
+  "title": "Fix label layout: prevent text and barcode overlap, ensure full barcode visibility",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Update label dimensions to 58mm × 43mm and ensure all components use these exact dimensions",
+      "summary": "Fix label layout to prevent text and barcode from overlapping on printed labels",
       "acceptanceCriteria": [
-        "Label settings store default dimensions are set to 58mm × 43mm",
-        "CPCL generator uses 58mm × 43mm for label boundaries",
-        "Label preview displays 58mm × 43mm dimensions"
+        "Text elements (prefix, serial number) do not overlap with barcode elements",
+        "All text remains fully readable without obstruction",
+        "Layout adjustments maintain proper spacing between text and barcode"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/state/labelSettingsStore.ts",
-          "operation": "modify",
-          "description": "Update the default label dimensions in the store initialization from current values to widthMm: 58 and heightMm: 43. Ensure these defaults apply to new installations and are used when no persisted settings exist."
-        },
-        {
           "path": "frontend/src/printing/cpclGenerator.ts",
           "operation": "modify",
-          "description": "Verify that CPCL generation respects the widthMm and heightMm values from labelSettings for label boundaries. Ensure all positioning and clipping logic uses these dimensions (converted to dots at 203 DPI) rather than hardcoded values."
+          "description": "Adjust Y-position calculations for text elements (prefix and serial numbers) to ensure adequate vertical spacing above and below the barcode. Modify the generateCPCLForLabel function to position text elements with sufficient margins from barcode boundaries, preventing overlap. Use the LayoutSettings from labelSettings to compute non-overlapping Y-coordinates for titleLayout, serialText1Layout, serialText2Layout, barcode1Layout, and barcode2Layout."
         },
         {
           "path": "frontend/src/printing/LabelPreview.tsx",
           "operation": "modify",
-          "description": "Ensure the preview component renders labels using the exact dimensions from labelSettings (58mm × 43mm). Verify the preview canvas scales correctly to display the full label area at various zoom levels."
+          "description": "Update the preview rendering logic to accurately reflect the adjusted text and barcode positioning. Ensure that the visual preview matches the actual CPCL output by applying the same Y-position calculations and spacing adjustments used in cpclGenerator.ts. This helps users verify that text and barcodes are properly separated before printing."
         }
       ]
     },
     {
       "id": "REQ-2",
-      "summary": "Adjust barcode width parameters to ensure both barcodes fit completely within the 58mm label width for scannable output",
+      "summary": "Ensure the complete barcode is visible and scannable on the 58mm × 43mm label",
       "acceptanceCriteria": [
-        "Both barcodes fit within 58mm label width with no clipping",
-        "Barcode width is adjusted in CPCL generation to maximize width while staying within boundaries",
-        "Generated labels match the visual layout of the reference photos (frontend/public/assets/1771682557066499855940811118309.jpg, frontend/public/assets/image-11.png, frontend/public/assets/17717694923414593234117505414352.jpg, frontend/public/assets/image-12.png)",
-        "Printed barcodes are scannable without manual adjustment"
+        "Entire barcode prints within the label boundaries",
+        "No barcode clipping occurs at edges",
+        "Barcode remains scannable with standard barcode readers",
+        "Barcode width and positioning fit within the 58mm label width"
       ],
       "file_operations": [
         {
           "path": "frontend/src/printing/cpclLayoutAdjustments.ts",
           "operation": "modify",
-          "description": "Update the barcode width calculation logic to ensure barcodes span nearly the full 58mm label width (converted to dots) while avoiding clipping. Adjust the clampBarcodeX function and estimateCODE128WidthDots to account for the new label dimensions and match the reference photo layout where barcodes extend edge-to-edge."
+          "description": "Enhance the clampBarcodeXPosition function to better handle barcode width calculations and prevent clipping at label edges. Improve the estimateCODE128WidthInDots function to provide more accurate width estimates for different barcode types and data lengths. Add validation to ensure computed barcode X positions and widths fit within the 58mm (463 dots at 203 DPI) label width constraint."
         },
         {
           "path": "frontend/src/printing/cpclGenerator.ts",
           "operation": "modify",
-          "description": "Adjust the CPCL barcode generation commands to use optimized width parameters that maximize barcode width within the 58mm label boundaries. Ensure both barcode1 and barcode2 use consistent width settings and apply layout adjustments from cpclLayoutAdjustments.ts. Add validation logging to confirm barcodes fit within label bounds."
+          "description": "Apply the enhanced clampBarcodeXPosition function when generating CPCL barcode commands. Ensure that barcode X and Y coordinates, along with computed widths, are validated against label boundaries (58mm × 43mm). If a barcode would extend beyond the label edge, adjust its position or scale to fit within bounds while maintaining scannability."
+        },
+        {
+          "path": "frontend/src/printing/cpclBarcodeDiagnostics.ts",
+          "operation": "modify",
+          "description": "Add diagnostic checks to validate that generated barcodes fit within the 58mm × 43mm label dimensions. Include warnings in diagnostic logs when barcode width or positioning approaches or exceeds label boundaries. This helps identify potential clipping issues before printing."
         },
         {
           "path": "frontend/src/printing/LabelPreview.tsx",
           "operation": "modify",
-          "description": "Update the preview rendering to reflect the adjusted barcode widths. Ensure the preview accurately shows barcodes spanning nearly the full label width, matching the reference photos. Apply the same width calculations used in CPCL generation to the SVG preview elements."
-        },
-        {
-          "path": "frontend/src/state/labelSettingsStore.ts",
-          "operation": "modify",
-          "description": "Review and adjust default barcode layout settings (barcode1Layout.width, barcode2Layout.width) to support wider barcodes within the 58mm label. Ensure these defaults produce scannable barcodes that match the reference photo layout."
+          "description": "Update the preview to visually indicate when a barcode would clip at the label edges. Ensure the preview accurately shows the full barcode extent and highlights any overflow beyond the 58mm × 43mm boundaries to alert users before printing."
         }
       ]
     },
     {
       "id": "REQ-3",
-      "summary": "When scanning with incorrect barcode prefix, display error, play sound, and automatically clear input for immediate re-scan",
+      "summary": "Adjust CPCL generation logic to properly position text and barcode elements with sufficient spacing",
       "acceptanceCriteria": [
-        "Error message displays when scanned barcode prefix does not match any configured prefix mapping",
-        "Error sound plays when incorrect prefix detected",
-        "Input box is cleared automatically after showing error",
-        "User can immediately scan again without manual intervention",
-        "Validation applies to both first and second barcode scans"
+        "CPCL commands position text above or below barcode with adequate margins",
+        "Barcode Y-position adjusted to prevent overlap with text elements",
+        "Generated CPCL produces cleanly separated text and barcode sections"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/tabs/ScanPrintTab.tsx",
+          "path": "frontend/src/printing/cpclGenerator.ts",
           "operation": "modify",
-          "description": "Enhance the barcode scanning validation logic for both serial1 and serial2 inputs. When a scanned barcode prefix does not match any configured prefix mapping in labelSettings, trigger the error sound from soundSystem, display a clear error message indicating the invalid prefix, and automatically clear the input field (set value to empty string) so the user can scan again immediately. Ensure this validation runs before any other processing and applies to both first and second barcode scans."
-        }
-      ]
-    },
-    {
-      "id": "REQ-4",
-      "summary": "Detect and show an error if the user scans the same serial number again (duplicate serial detection)",
-      "acceptanceCriteria": [
-        "System detects when the same serial number is scanned twice",
-        "Error message displays clearly indicating duplicate serial",
-        "Duplicate serial is not processed or printed",
-        "Error sound plays on duplicate detection"
-      ],
-      "file_operations": [
+          "description": "Refactor the CPCL command generation to implement a hierarchical layout strategy that positions text and barcode elements with explicit vertical spacing. Use the LayoutSettings (titleLayout, serialText1Layout, serialText2Layout, barcode1Layout, barcode2Layout) and their verticalSpacing properties to calculate non-overlapping Y-coordinates. Ensure that text elements (TEXT commands) are positioned with adequate margins above or below barcode elements (BARCODE commands), preventing any overlap."
+        },
         {
-          "path": "frontend/src/tabs/ScanPrintTab.tsx",
+          "path": "frontend/src/state/labelSettingsStore.ts",
           "operation": "modify",
-          "description": "Add duplicate serial detection logic to the scanning workflow. Track recently scanned serials (consider using a Set or array of recent scans, possibly stored in component state or a ref). When a serial is scanned, check if it matches any recently scanned serial. If a duplicate is detected, display a clear error message (e.g., 'Duplicate serial detected'), play the error sound from soundSystem, and prevent further processing or printing. Clear the input field automatically. Consider defining a reasonable time window or count for duplicate detection (e.g., last 10 scans or scans within the last session)."
+          "description": "Review and adjust the default LayoutSettings values (Y-positions, verticalSpacing) to ensure they provide adequate separation between text and barcode elements for the 58mm × 43mm label. If necessary, update the default configuration to reflect better spacing values that prevent overlap out-of-the-box."
+        },
+        {
+          "path": "frontend/src/utils/barcodeSettingsValidation.ts",
+          "operation": "modify",
+          "description": "Add validation rules that check for sufficient vertical spacing between text and barcode elements. Ensure that the validation logic flags configurations where text Y-positions overlap with barcode Y-positions plus barcode height, preventing invalid settings from being saved."
+        },
+        {
+          "path": "frontend/src/tabs/LabelSettingsTab.tsx",
+          "operation": "modify",
+          "description": "Update the label settings UI to provide clearer guidance on Y-position and spacing adjustments. Add helpful tooltips or inline hints that explain how to set Y-coordinates and verticalSpacing to avoid text and barcode overlap. Ensure the preview updates in real-time as users adjust layout settings."
         }
       ]
     }

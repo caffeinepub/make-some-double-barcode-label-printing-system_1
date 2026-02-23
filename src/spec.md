@@ -1,12 +1,11 @@
 # Specification
 
 ## Summary
-**Goal:** Fix label dimensions to 58mm × 43mm, adjust barcode width for proper scanning, and improve scan validation with automatic error recovery.
+**Goal:** Fix label layout to prevent text and barcode overlap and ensure complete barcode visibility on 58mm × 43mm labels.
 
 **Planned changes:**
-- Update label dimensions to 58mm width × 43mm height in label settings and CPCL generation
-- Adjust barcode width parameters to ensure both barcodes fit within 58mm label width and match reference photo layout
-- Add automatic input clearing after incorrect barcode prefix detection
-- Implement duplicate serial number detection with error message
+- Adjust CPCL generation logic to properly position text and barcode elements with sufficient spacing
+- Ensure barcode fits completely within label boundaries without clipping
+- Prevent text elements (prefix, serial number) from overlapping with barcode
 
-**User-visible outcome:** Labels print at correct 58mm × 43mm dimensions with full-width scannable barcodes matching reference photos, and scanning errors automatically clear the input for immediate retry. Duplicate serial scans are detected and prevented.
+**User-visible outcome:** Users can print labels where the text and barcode are clearly separated, fully visible, and the barcode is scannable with standard readers.

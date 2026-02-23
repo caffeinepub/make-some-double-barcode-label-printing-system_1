@@ -168,6 +168,17 @@ function applyAllOffsets(
 }
 
 /**
+ * Calculate text height in dots for proper spacing
+ */
+function calculateTextHeightDots(fontSize: number, scale: number): number {
+  // CPCL font size 7 is approximately 3mm tall
+  // Font size 4 is approximately 2mm tall
+  // Estimate: fontSize * 0.5mm per unit * scale
+  const heightMm = fontSize * 0.5 * scale;
+  return mmToDots(heightMm);
+}
+
+/**
  * Generate CPCL commands from label settings and serial data
  */
 export function generateCPCL(
@@ -230,7 +241,19 @@ export function generateCPCL(
   lines.push('! 0 200 200 ' + heightDots + ' 1');
   lines.push('PAGE-WIDTH ' + widthDots);
 
-  // Title - apply all offsets
+  // Calculate barcode heights first (needed for layout calculations)
+  const barcode1HeightMm = Number(barcode1Layout.height);
+  const barcode1Scale = barcode1Layout.scale;
+  const barcode1Height = calculateBarcodeHeight(barcode1HeightMm, barcode1Scale, 'Barcode 1', 1);
+
+  const barcode2HeightMm = Number(barcode2Layout.height);
+  const barcode2Scale = barcode2Layout.scale;
+  const barcode2Height = calculateBarcodeHeight(barcode2HeightMm, barcode2Scale, 'Barcode 2', 2);
+
+  // Calculate title height for spacing check
+  const titleHeightDots = calculateTextHeightDots(Number(titleLayout.fontSize), titleLayout.scale);
+
+  // Title - apply all offsets and ensure it doesn't overlap with barcode 1
   const titlePos = applyAllOffsets(
     Number(titleLayout.x),
     Number(titleLayout.y),
@@ -239,8 +262,26 @@ export function generateCPCL(
     calibrationOffsetXmm,
     calibrationOffsetYmm
   );
+  
+  // Check if title would overlap with barcode 1
+  const barcode1YDots = mmToDots(Number(barcode1Position.y) + globalVerticalOffset + calibrationOffsetYmm);
+  const titleBottomDots = mmToDots(titlePos.y) + titleHeightDots;
+  const minSpacingDots = mmToDots(1); // 1mm minimum spacing
+  
+  let adjustedTitleY = titlePos.y;
+  if (titleBottomDots + minSpacingDots > barcode1YDots) {
+    // Move title up to prevent overlap
+    adjustedTitleY = titlePos.y - ((titleBottomDots + minSpacingDots - barcode1YDots) / mmToDots(1));
+    addLog('warn', `Title adjusted to prevent overlap with Barcode 1: ${titlePos.y.toFixed(1)}mm → ${adjustedTitleY.toFixed(1)}mm`, {
+      category: 'layout',
+      reasonCode: 'TITLE_OVERLAP_PREVENTED',
+      originalY: titlePos.y,
+      adjustedY: adjustedTitleY,
+    });
+  }
+
   const titleX = mmToDots(titlePos.x);
-  const titleY = mmToDots(titlePos.y);
+  const titleY = mmToDots(adjustedTitleY);
   const titleScaleX = clampScale(titleLayout.scale, 'Title X');
   const titleScaleY = clampScale(titleLayout.scale, 'Title Y');
   lines.push(`SETMAG ${titleScaleX} ${titleScaleY}`);
@@ -248,10 +289,6 @@ export function generateCPCL(
   lines.push(`SETMAG 1 1`);
 
   // Barcode 1 - use barcode1Position for placement
-  const barcode1HeightMm = Number(barcode1Layout.height);
-  const barcode1Scale = barcode1Layout.scale;
-  const barcode1Height = calculateBarcodeHeight(barcode1HeightMm, barcode1Scale, 'Barcode 1', 1);
-
   // Apply all offsets to barcode 1 position
   const barcode1Pos = applyAllOffsets(
     Number(barcode1Position.x),
@@ -296,9 +333,11 @@ export function generateCPCL(
   );
 
   // Serial Text 1 - positioned below barcode 1 using verticalSpacing
+  // Ensure minimum spacing between barcode and text
+  const minTextSpacing = Math.max(Number(barcode1Position.verticalSpacing), 1); // At least 1mm
   const serial1Pos = applyAllOffsets(
     Number(barcode1Position.x),
-    Number(barcode1Position.y) + barcode1HeightMm + Number(barcode1Position.verticalSpacing),
+    Number(barcode1Position.y) + barcode1HeightMm + minTextSpacing,
     globalHorizontalOffset,
     globalVerticalOffset,
     calibrationOffsetXmm,
@@ -314,10 +353,6 @@ export function generateCPCL(
   lines.push(`SETMAG 1 1`);
 
   // Barcode 2 - use barcode2Position for placement
-  const barcode2HeightMm = Number(barcode2Layout.height);
-  const barcode2Scale = barcode2Layout.scale;
-  const barcode2Height = calculateBarcodeHeight(barcode2HeightMm, barcode2Scale, 'Barcode 2', 2);
-
   // Apply all offsets to barcode 2 position
   const barcode2Pos = applyAllOffsets(
     Number(barcode2Position.x),
@@ -362,9 +397,11 @@ export function generateCPCL(
   );
 
   // Serial Text 2 - positioned below barcode 2 using verticalSpacing
+  // Ensure minimum spacing between barcode and text
+  const minTextSpacing2 = Math.max(Number(barcode2Position.verticalSpacing), 1); // At least 1mm
   const serial2Pos = applyAllOffsets(
     Number(barcode2Position.x),
-    Number(barcode2Position.y) + barcode2HeightMm + Number(barcode2Position.verticalSpacing),
+    Number(barcode2Position.y) + barcode2HeightMm + minTextSpacing2,
     globalHorizontalOffset,
     globalVerticalOffset,
     calibrationOffsetXmm,
@@ -429,6 +466,15 @@ export function generateCPCLWithTitle(
   lines.push('! 0 200 200 ' + heightDots + ' 1');
   lines.push('PAGE-WIDTH ' + widthDots);
 
+  // Calculate barcode heights
+  const barcode1HeightMm = Number(barcode1Layout.height);
+  const barcode1Scale = barcode1Layout.scale;
+  const barcode1Height = calculateBarcodeHeight(barcode1HeightMm, barcode1Scale, 'Barcode 1', 1);
+
+  const barcode2HeightMm = Number(barcode2Layout.height);
+  const barcode2Scale = barcode2Layout.scale;
+  const barcode2Height = calculateBarcodeHeight(barcode2HeightMm, barcode2Scale, 'Barcode 2', 2);
+
   // Title - apply all offsets
   const titlePos = applyAllOffsets(
     Number(titleLayout.x),
@@ -447,10 +493,6 @@ export function generateCPCLWithTitle(
   lines.push(`SETMAG 1 1`);
 
   // Barcode 1
-  const barcode1HeightMm = Number(barcode1Layout.height);
-  const barcode1Scale = barcode1Layout.scale;
-  const barcode1Height = calculateBarcodeHeight(barcode1HeightMm, barcode1Scale, 'Barcode 1', 1);
-
   const barcode1Pos = applyAllOffsets(
     Number(barcode1Position.x),
     Number(barcode1Position.y),
@@ -477,9 +519,10 @@ export function generateCPCLWithTitle(
   );
 
   // Serial Text 1
+  const minTextSpacing = Math.max(Number(barcode1Position.verticalSpacing), 1);
   const serial1Pos = applyAllOffsets(
     Number(barcode1Position.x),
-    Number(barcode1Position.y) + barcode1HeightMm + Number(barcode1Position.verticalSpacing),
+    Number(barcode1Position.y) + barcode1HeightMm + minTextSpacing,
     globalHorizontalOffset,
     globalVerticalOffset,
     calibrationOffsetXmm,
@@ -495,10 +538,6 @@ export function generateCPCLWithTitle(
   lines.push(`SETMAG 1 1`);
 
   // Barcode 2
-  const barcode2HeightMm = Number(barcode2Layout.height);
-  const barcode2Scale = barcode2Layout.scale;
-  const barcode2Height = calculateBarcodeHeight(barcode2HeightMm, barcode2Scale, 'Barcode 2', 2);
-
   const barcode2Pos = applyAllOffsets(
     Number(barcode2Position.x),
     Number(barcode2Position.y),
@@ -525,9 +564,10 @@ export function generateCPCLWithTitle(
   );
 
   // Serial Text 2
+  const minTextSpacing2 = Math.max(Number(barcode2Position.verticalSpacing), 1);
   const serial2Pos = applyAllOffsets(
     Number(barcode2Position.x),
-    Number(barcode2Position.y) + barcode2HeightMm + Number(barcode2Position.verticalSpacing),
+    Number(barcode2Position.y) + barcode2HeightMm + minTextSpacing2,
     globalHorizontalOffset,
     globalVerticalOffset,
     calibrationOffsetXmm,

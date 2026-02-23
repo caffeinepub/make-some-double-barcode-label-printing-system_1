@@ -76,5 +76,26 @@ export function validateBarcodeSettings(settings: BackendLabelSettings): string 
     return 'Serial Text 2 scale must be greater than 0. Please increase the scale value.';
   }
 
+  // Validate spacing between elements
+  const barcode1Y = Number(settings.barcode1Position.y);
+  const barcode1Height = barcode1HeightMm * barcode1Scale;
+  const barcode1BottomY = barcode1Y + barcode1Height;
+  
+  const barcode2Y = Number(settings.barcode2Position.y);
+  
+  // Check if barcodes overlap
+  if (barcode1BottomY + 2 > barcode2Y) { // 2mm minimum spacing
+    return 'Barcode 1 and Barcode 2 are too close together. Please increase vertical spacing between them (minimum 2mm gap recommended).';
+  }
+
+  // Validate barcode positions are within label bounds
+  const labelHeightMm = Number(settings.heightMm);
+  const barcode2Height = barcode2HeightMm * barcode2Scale;
+  const barcode2BottomY = barcode2Y + barcode2Height + Number(settings.barcode2Position.verticalSpacing) + 3; // +3mm for text height
+  
+  if (barcode2BottomY > labelHeightMm) {
+    return `Barcode 2 and its text extend beyond the label height (${labelHeightMm}mm). Please adjust barcode positions or reduce barcode heights.`;
+  }
+
   return null;
 }
