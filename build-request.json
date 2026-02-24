@@ -1,0 +1,78 @@
+{
+  "kind": "build_request",
+  "title": "Adjust barcode width to fit label, add width setting, and enforce unique serial validation",
+  "priority": "normal",
+  "requirements": [
+    {
+      "id": "REQ-1",
+      "text": "Reduce the default barcode width in the CPCL generator so that both barcodes fit fully within the printable area of the label without being clipped on either side. Reference cpclGenerator.ts and cpclLayoutAdjustments.ts to tighten the width calculation and enforce a safe maximum width based on label dimensions minus left/right margins.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-1"
+        ],
+        "quotes": [
+          "barcode still not fully on label. Adjust the width of the barcodes"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Both barcodes are fully visible within the label boundaries when printed",
+        "No barcode bars are clipped at the left or right edge of the label",
+        "Default barcode width is calculated relative to label width minus safe margins"
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "text": "Add a 'Barcode Width' numeric input control in the Label Settings tab (LabelSettingsTab.tsx) that allows the user to fine-tune the barcode width value. This setting must be persisted in the label settings store (labelSettingsStore.ts) alongside existing barcode layout fields, and must be applied when generating CPCL commands in cpclGenerator.ts.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-1"
+        ],
+        "quotes": [
+          "Add option in label settings to adjust the width so user can do fine tuning"
+        ]
+      },
+      "acceptanceCriteria": [
+        "A numeric input labelled 'Barcode Width' is visible in the Label Settings tab under barcode layout options",
+        "Changing the value updates the persisted label settings",
+        "The CPCL generator uses the stored barcode width value when producing print commands",
+        "The label preview reflects the updated barcode width",
+        "The setting is included in settings import/export"
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "text": "In the two-step scan workflow (ScanPrintTab.tsx), when the user scans the 2nd barcode, compare its normalized serial value against the already-scanned 1st serial. If they are identical, display a visible error message stating the two serials must be unique, play the error sound using the existing sound system (soundSystem.ts), and clear the 2nd input so the user can re-scan. Do not proceed to print when this duplicate condition is detected.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-1"
+        ],
+        "quotes": [
+          "when scanning 2nd barcode if user scan same serial as 1st show error and make sound notification. 1st and 2nd serial must be unique"
+        ]
+      },
+      "acceptanceCriteria": [
+        "If the 2nd scanned serial equals the 1st scanned serial (after normalization), an error message is shown immediately",
+        "The error sound is played via the sound system when this duplicate is detected",
+        "The 2nd serial input is cleared so the user can scan again",
+        "The print workflow does not proceed when the duplicate condition is detected",
+        "No error is shown when the two serials are different"
+      ]
+    }
+  ],
+  "constraints": [
+    "Do not modify files under frontend/src/hooks/ or frontend/src/components/ui/",
+    "Sound notification must use the existing soundSystem.ts error sound, not a new audio implementation"
+  ],
+  "nonGoals": [
+    "Adding backend validation for duplicate serials within the same print job",
+    "Changing the overall label dimensions or label type definitions",
+    "Modifying the 1st barcode duplicate-detection logic that already exists against backend history"
+  ],
+  "imageRequirements": {
+    "required": [],
+    "edits": []
+  }
+}

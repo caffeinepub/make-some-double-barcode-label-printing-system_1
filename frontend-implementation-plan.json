@@ -1,0 +1,84 @@
+{
+  "kind": "implementation_plan",
+  "version": "1.0",
+  "title": "Adjust barcode width to fit label, add width setting, and enforce unique serial validation",
+  "requirements": [
+    {
+      "id": "REQ-1",
+      "summary": "Reduce the default barcode width in the CPCL generator so that both barcodes fit fully within the printable area of the label without being clipped",
+      "acceptanceCriteria": [
+        "Both barcodes are fully visible within the label boundaries when printed",
+        "No barcode bars are clipped at the left or right edge of the label",
+        "Default barcode width is calculated relative to label width minus safe margins"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/printing/cpclGenerator.ts",
+          "operation": "modify",
+          "description": "Update the barcode width calculation logic in the CPCL command generation to enforce a tighter default maximum width. Use the label width from settings, subtract safe left/right margins (e.g., 5mm on each side), and ensure the calculated barcode width does not exceed this safe maximum. Apply this constraint in the barcode command generation sections for both barcode1 and barcode2."
+        },
+        {
+          "path": "frontend/src/printing/cpclLayoutAdjustments.ts",
+          "operation": "modify",
+          "description": "Refine the estimateCODE128Width function or add a new helper function to calculate a safe maximum barcode width based on label dimensions. The function should accept label width in mm, convert to dots, subtract margin dots (left + right), and return the maximum allowable barcode width in dots. Use this helper in cpclGenerator.ts to clamp barcode widths."
+        }
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "summary": "Add a 'Barcode Width' numeric input control in the Label Settings tab that allows the user to fine-tune the barcode width value",
+      "acceptanceCriteria": [
+        "A numeric input labelled 'Barcode Width' is visible in the Label Settings tab under barcode layout options",
+        "Changing the value updates the persisted label settings",
+        "The CPCL generator uses the stored barcode width value when producing print commands",
+        "The label preview reflects the updated barcode width",
+        "The setting is included in settings import/export"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/state/labelSettingsStore.ts",
+          "operation": "modify",
+          "description": "Add a new 'barcodeWidth' field (type bigint, representing width in dots or mm) to the LabelSettings type and the default settings object. Ensure this field is included in the BigInt serialization and deserialization logic for localStorage persistence. Update the migration logic to initialize barcodeWidth with a safe default value (e.g., 400 dots or converted from mm) if upgrading from older settings versions."
+        },
+        {
+          "path": "frontend/src/tabs/LabelSettingsTab.tsx",
+          "operation": "modify",
+          "description": "Add a numeric input control labelled 'Barcode Width' in the appropriate section of the Label Settings tab UI (e.g., near other barcode layout controls like barcodeHeight). Wire the input to read from and update labelSettingsStore.barcodeWidth. Include unit labels (dots or mm) and reasonable min/max constraints. Ensure the input follows the existing pattern for handling BigInt values (convert to Number for input, convert back to BigInt on change). Verify the LabelPreview component reflects changes to this setting."
+        },
+        {
+          "path": "frontend/src/printing/cpclGenerator.ts",
+          "operation": "modify",
+          "description": "Update the CPCL barcode command generation to use the barcodeWidth value from labelSettings instead of a hardcoded or calculated default. If barcodeWidth is set, use it; otherwise, fall back to the safe maximum calculated in REQ-1. Ensure both barcode1 and barcode2 commands respect this setting."
+        },
+        {
+          "path": "frontend/src/utils/labelSettingsImportExport.ts",
+          "operation": "modify",
+          "description": "Ensure the barcodeWidth field is included in the settings export and import logic. Update the validation and migration functions to handle the new field, setting a safe default if missing in imported settings."
+        },
+        {
+          "path": "frontend/src/printing/LabelPreview.tsx",
+          "operation": "modify",
+          "description": "Ensure the preview rendering logic respects the barcodeWidth setting from labelSettingsStore when displaying barcode elements. If the preview uses SVG or canvas rendering for barcodes, apply the width value appropriately so users see the width change in real time."
+        }
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "summary": "In the two-step scan workflow, when the user scans the 2nd barcode, compare its normalized serial value against the already-scanned 1st serial and display an error if they are identical",
+      "acceptanceCriteria": [
+        "If the 2nd scanned serial equals the 1st scanned serial (after normalization), an error message is shown immediately",
+        "The error sound is played via the sound system when this duplicate is detected",
+        "The 2nd serial input is cleared so the user can scan again",
+        "The print workflow does not proceed when the duplicate condition is detected",
+        "No error is shown when the two serials are different"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/tabs/ScanPrintTab.tsx",
+          "operation": "modify",
+          "description": "In the handleSerial2Change function (or equivalent second serial input handler), after normalizing the scanned serial using normalizeSerial, compare it to the normalized first serial. If they match, immediately display a visible error message (e.g., 'Error: The two serials must be unique. Please scan a different serial.'), call soundSystem.playErrorSound() to play the error notification sound, and clear the second serial input value. Ensure the print workflow logic checks for this duplicate condition and does not proceed with submission or printing if the two serials are identical."
+        }
+      ]
+    }
+  ]
+}
