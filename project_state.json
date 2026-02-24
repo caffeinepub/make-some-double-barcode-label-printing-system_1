@@ -1,61 +1,32 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Label printing app with barcode scanning functionality. User is iterating on label layout with barcode width adjustments and duplicate serial validation.",
-  "architectural_notes": [
-    "1st and 2nd scanned serials must be unique; duplicate detection required at scan time with audio feedback"
-  ],
+  "summary": "Label printing/settings project with barcode and serial validation features.",
+  "architectural_notes": [],
   "known_issues": [
-    "Barcode not fully fitting within label boundaries (width needs adjustment)"
+    "Barcode width settings missing from label settings tab"
   ],
   "isFixRequest": true,
-  "existing_features": [],
-  "new_feature_requests": [
+  "existing_features": [
     {
-      "id": "AR-1",
-      "summary": "Adjust barcode width so barcode fits fully within label boundaries",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-2",
-      "summary": "Add barcode width adjustment option in label settings for user fine-tuning",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-3",
-      "summary": "When scanning 2nd barcode, show error and play sound notification if serial matches 1st barcode (serials must be unique)",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-4",
-      "summary": "Reduce the default barcode width in the CPCL generator so that both barcodes fit fully within the printable area of the label without being clipped on either side. Reference cpclGenerator.ts and cpclLayoutAdjustments.ts to tighten the width calculation and enforce a safe maximum width based on label dimensions minus left/right margins.",
+      "id": "feature-add-a-barcode-width-input-field-to-the-label-settings-tab-ui-the-field-should-allow-users-to-adjust-the-barcode-width-in-dots-or-appropriate-unit-consistent-with-existing-settings-it-must-read-from-and-write-to-the-labelsettingsstore-be-validated-via-barcodesettingsvalidation-and-be-reflected-live-in-the-labelpreview-component",
+      "title": "Add a barcode width input field to the Label Settings tab UI. The field should allow users to adjust the barcode width (in dots or appropriate unit consistent with existing settings). It must read from and write to the labelSettingsStore, be validated via barcodeSettingsValidation, and be reflected live in the LabelPreview component.",
       "reqIds": [
         "REQ-1"
       ],
-      "status": "pending"
-    },
+      "version": 1
+    }
+  ],
+  "new_feature_requests": [
     {
-      "id": "AR-5",
-      "summary": "Add a 'Barcode Width' numeric input control in the Label Settings tab (LabelSettingsTab.tsx) that allows the user to fine-tune the barcode width value. This setting must be persisted in the label settings store (labelSettingsStore.ts) alongside existing barcode layout fields, and must be applied when generating CPCL commands in cpclGenerator.ts.",
-      "reqIds": [
-        "REQ-2"
-      ],
-      "status": "pending"
-    },
-    {
-      "id": "AR-6",
-      "summary": "In the two-step scan workflow (ScanPrintTab.tsx), when the user scans the 2nd barcode, compare its normalized serial value against the already-scanned 1st serial. If they are identical, display a visible error message stating the two serials must be unique, play the error sound using the existing sound system (soundSystem.ts), and clear the 2nd input so the user can re-scan. Do not proceed to print when this duplicate condition is detected.",
-      "reqIds": [
-        "REQ-3"
-      ],
+      "id": "AR-1",
+      "summary": "Add barcode width settings in the label settings tab",
+      "reqIds": [],
       "status": "pending"
     }
   ],
   "gameProjectType": "none",
-  "projectName": "Adjust barcode width to fit label, add width setting, and enforce unique serial validation",
+  "projectName": "Make Some Double!! Barcode Label Printing",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

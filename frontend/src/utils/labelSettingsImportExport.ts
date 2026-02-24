@@ -1,326 +1,64 @@
-import type { LabelSettings as BackendLabelSettings, LayoutSettings, BarcodePosition } from '../backend';
-import type { ExtendedLabelSettings } from '../state/labelSettingsStore';
-import { validateBarcodeSettings } from './barcodeSettingsValidation';
+import { LabelSettings, DEFAULT_LABEL_SETTINGS, BarcodePosition } from '../state/labelSettingsStore';
 
-/**
- * Serialize label settings to a BigInt-safe JSON string for export
- */
-export function exportLabelSettings(settings: BackendLabelSettings | ExtendedLabelSettings): string {
-  return JSON.stringify(settings, (key, val) => {
-    // Convert BigInt to string with 'n' suffix
-    if (typeof val === 'bigint') {
-      return val.toString() + 'n';
-    }
-    return val;
-  }, 2);
-}
-
-/**
- * Create default layout settings
- */
-function createDefaultLayout(x: number, y: number, width: number, height: number, fontSize: number, verticalSpacing: number = 0): LayoutSettings {
-  return {
-    x: BigInt(x),
-    y: BigInt(y),
-    scale: 1.0,
-    width: BigInt(width),
-    height: BigInt(height),
-    fontSize: BigInt(fontSize),
-    verticalSpacing: BigInt(verticalSpacing),
-  };
-}
-
-/**
- * Create default barcode position
- */
-function createDefaultBarcodePosition(x: number, y: number, verticalSpacing: number): BarcodePosition {
-  return {
-    x: BigInt(x),
-    y: BigInt(y),
-    verticalSpacing: BigInt(verticalSpacing),
-  };
-}
-
-/**
- * Migrate old settings structure to new layout-based structure
- */
-function migrateOldSettings(parsed: any): ExtendedLabelSettings {
-  // If already has new structure, ensure all required fields exist
-  if (parsed.titleLayout && parsed.barcode1Layout) {
-    return {
-      ...parsed,
-      barcode1Position: parsed.barcode1Position || createDefaultBarcodePosition(2, 2, 1),
-      barcode2Position: parsed.barcode2Position || createDefaultBarcodePosition(2, 14, 1),
-      globalHorizontalOffset: parsed.globalHorizontalOffset !== undefined ? parsed.globalHorizontalOffset : BigInt(0),
-      globalVerticalOffset: parsed.globalVerticalOffset !== undefined ? parsed.globalVerticalOffset : BigInt(0),
-      calibrationOffsetXmm: parsed.calibrationOffsetXmm ?? 0,
-      calibrationOffsetYmm: parsed.calibrationOffsetYmm ?? 0,
-    } as ExtendedLabelSettings;
+// BigInt-safe JSON serialization
+function replacer(_key: string, value: unknown): unknown {
+  if (typeof value === 'bigint') {
+    return { __bigint__: value.toString() };
   }
+  return value;
+}
 
-  // Migrate from old structure
-  const widthMm = Number(parsed.widthMm || 50);
-  const heightMm = Number(parsed.heightMm || 25);
-  const barcodeHeight = Number(parsed.barcodeHeight || 10);
-  const spacing = Number(parsed.spacing || 5);
-  const titlePosition = Number(parsed.titlePosition || 0);
-  const fontSize = Number(parsed.fontSize || 12);
+function reviver(_key: string, value: unknown): unknown {
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    '__bigint__' in value &&
+    typeof (value as Record<string, unknown>).__bigint__ === 'string'
+  ) {
+    return BigInt((value as Record<string, string>).__bigint__);
+  }
+  return value;
+}
 
-  // Calculate positions based on old layout
-  const titleY = titlePosition || 2;
-  const barcode1Y = titleY + 6;
-  const serial1Y = barcode1Y + barcodeHeight + 1;
-  const barcode2Y = serial1Y + spacing + 2;
-  const serial2Y = barcode2Y + barcodeHeight + 1;
+export function exportLabelSettings(settings: LabelSettings): string {
+  return JSON.stringify(settings, replacer, 2);
+}
+
+export function importLabelSettings(json: string): LabelSettings {
+  const parsed = JSON.parse(json, reviver) as Partial<LabelSettings>;
+
+  // Migrate / backfill missing fields with defaults
+  const barcode1Position: BarcodePosition = {
+    xMm: parsed.barcode1Position?.xMm ?? DEFAULT_LABEL_SETTINGS.barcode1Position.xMm,
+    yMm: parsed.barcode1Position?.yMm ?? DEFAULT_LABEL_SETTINGS.barcode1Position.yMm,
+    textSpacingMm:
+      parsed.barcode1Position?.textSpacingMm ??
+      DEFAULT_LABEL_SETTINGS.barcode1Position.textSpacingMm,
+  };
+
+  const barcode2Position: BarcodePosition = {
+    xMm: parsed.barcode2Position?.xMm ?? DEFAULT_LABEL_SETTINGS.barcode2Position.xMm,
+    yMm: parsed.barcode2Position?.yMm ?? DEFAULT_LABEL_SETTINGS.barcode2Position.yMm,
+    textSpacingMm:
+      parsed.barcode2Position?.textSpacingMm ??
+      DEFAULT_LABEL_SETTINGS.barcode2Position.textSpacingMm,
+  };
 
   return {
-    widthMm: BigInt(widthMm),
-    heightMm: BigInt(heightMm),
-    barcodeType: parsed.barcodeType || 'CODE128',
-    barcodeHeight: BigInt(barcodeHeight),
-    spacing: BigInt(spacing),
-    prefixMappings: parsed.prefixMappings || [],
-    titleLayout: createDefaultLayout(2, titleY, widthMm - 4, 4, fontSize, 0),
-    barcode1Layout: createDefaultLayout(2, barcode1Y, widthMm - 4, barcodeHeight, 10, 0),
-    serialText1Layout: createDefaultLayout(2, serial1Y, widthMm - 4, 3, 8, 0),
-    barcode2Layout: createDefaultLayout(2, barcode2Y, widthMm - 4, barcodeHeight, 10, 0),
-    serialText2Layout: createDefaultLayout(2, serial2Y, widthMm - 4, 3, 8, 0),
-    barcode1Position: createDefaultBarcodePosition(2, barcode1Y, 1),
-    barcode2Position: createDefaultBarcodePosition(2, barcode2Y, 1),
-    globalHorizontalOffset: BigInt(0),
-    globalVerticalOffset: BigInt(0),
-    calibrationOffsetXmm: 0,
-    calibrationOffsetYmm: 0,
+    widthMm: parsed.widthMm ?? DEFAULT_LABEL_SETTINGS.widthMm,
+    heightMm: parsed.heightMm ?? DEFAULT_LABEL_SETTINGS.heightMm,
+    barcodeType: parsed.barcodeType ?? DEFAULT_LABEL_SETTINGS.barcodeType,
+    barcodeHeight: parsed.barcodeHeight ?? DEFAULT_LABEL_SETTINGS.barcodeHeight,
+    barcodeWidth: parsed.barcodeWidth ?? DEFAULT_LABEL_SETTINGS.barcodeWidth, // migration: default 2
+    spacing: parsed.spacing ?? DEFAULT_LABEL_SETTINGS.spacing,
+    titleFontSize: parsed.titleFontSize ?? DEFAULT_LABEL_SETTINGS.titleFontSize,
+    serialFontSize: parsed.serialFontSize ?? DEFAULT_LABEL_SETTINGS.serialFontSize,
+    globalVerticalOffsetMm:
+      parsed.globalVerticalOffsetMm ?? DEFAULT_LABEL_SETTINGS.globalVerticalOffsetMm,
+    globalHorizontalOffsetMm:
+      parsed.globalHorizontalOffsetMm ?? DEFAULT_LABEL_SETTINGS.globalHorizontalOffsetMm,
+    barcode1Position,
+    barcode2Position,
+    prefixMappings: parsed.prefixMappings ?? DEFAULT_LABEL_SETTINGS.prefixMappings,
   };
-}
-
-/**
- * Parse and validate imported JSON into LabelSettings
- * Returns the parsed settings or throws an error with a descriptive message
- */
-export function importLabelSettings(jsonString: string): ExtendedLabelSettings {
-  let parsed: any;
-  
-  // Step 1: Parse JSON
-  try {
-    parsed = JSON.parse(jsonString, (key, value) => {
-      // Convert string representations back to BigInt
-      if (typeof value === 'string' && /^\d+n$/.test(value)) {
-        return BigInt(value.slice(0, -1));
-      }
-      return value;
-    });
-  } catch (error) {
-    throw new Error('Invalid JSON format. Please select a valid settings file.');
-  }
-  
-  // Step 2: Check if migration is needed (old format)
-  const needsMigration = !parsed.titleLayout || !parsed.barcode1Layout;
-  
-  if (needsMigration) {
-    // Validate old format fields
-    const oldRequiredFields = ['widthMm', 'heightMm', 'barcodeType', 'prefixMappings'];
-    for (const field of oldRequiredFields) {
-      if (!(field in parsed)) {
-        throw new Error(`Missing required field: ${field}`);
-      }
-    }
-    
-    // Migrate to new format
-    const migrated = migrateOldSettings(parsed);
-    
-    // Validate barcode settings after migration
-    const barcodeError = validateBarcodeSettings(migrated);
-    if (barcodeError) {
-      throw new Error(`Migrated settings validation failed: ${barcodeError}`);
-    }
-    
-    return migrated;
-  }
-  
-  // Step 3: Validate new format required fields
-  const requiredFields = [
-    'widthMm',
-    'heightMm',
-    'barcodeType',
-    'barcodeHeight',
-    'spacing',
-    'prefixMappings',
-    'titleLayout',
-    'barcode1Layout',
-    'serialText1Layout',
-    'barcode2Layout',
-    'serialText2Layout',
-  ];
-  
-  for (const field of requiredFields) {
-    if (!(field in parsed)) {
-      throw new Error(`Missing required field: ${field}`);
-    }
-  }
-  
-  // Validate types
-  if (typeof parsed.widthMm !== 'bigint') {
-    throw new Error('Invalid type for widthMm (expected number)');
-  }
-  if (typeof parsed.heightMm !== 'bigint') {
-    throw new Error('Invalid type for heightMm (expected number)');
-  }
-  if (typeof parsed.barcodeType !== 'string') {
-    throw new Error('Invalid type for barcodeType (expected string)');
-  }
-  if (typeof parsed.barcodeHeight !== 'bigint') {
-    throw new Error('Invalid type for barcodeHeight (expected number)');
-  }
-  if (typeof parsed.spacing !== 'bigint') {
-    throw new Error('Invalid type for spacing (expected number)');
-  }
-  if (!Array.isArray(parsed.prefixMappings)) {
-    throw new Error('Invalid type for prefixMappings (expected array)');
-  }
-  
-  // Validate layout objects
-  const layoutFields = ['titleLayout', 'barcode1Layout', 'serialText1Layout', 'barcode2Layout', 'serialText2Layout'];
-  for (const layoutField of layoutFields) {
-    const layout = parsed[layoutField];
-    if (typeof layout !== 'object' || layout === null) {
-      throw new Error(`Invalid ${layoutField} (expected object)`);
-    }
-    if (typeof layout.x !== 'bigint') {
-      throw new Error(`Invalid ${layoutField}.x (expected number)`);
-    }
-    if (typeof layout.y !== 'bigint') {
-      throw new Error(`Invalid ${layoutField}.y (expected number)`);
-    }
-    if (typeof layout.scale !== 'number') {
-      throw new Error(`Invalid ${layoutField}.scale (expected number)`);
-    }
-    if (typeof layout.width !== 'bigint') {
-      throw new Error(`Invalid ${layoutField}.width (expected number)`);
-    }
-    if (typeof layout.height !== 'bigint') {
-      throw new Error(`Invalid ${layoutField}.height (expected number)`);
-    }
-    if (typeof layout.fontSize !== 'bigint') {
-      throw new Error(`Invalid ${layoutField}.fontSize (expected number)`);
-    }
-    // verticalSpacing is optional for backward compatibility
-  }
-  
-  // Step 4: Validate prefix mappings structure
-  for (let i = 0; i < parsed.prefixMappings.length; i++) {
-    const mapping = parsed.prefixMappings[i];
-    
-    if (!Array.isArray(mapping) || mapping.length !== 2) {
-      throw new Error(`Invalid prefix mapping at index ${i} (expected [prefix, {labelType, title}])`);
-    }
-    
-    const [prefix, details] = mapping;
-    
-    if (typeof prefix !== 'string') {
-      throw new Error(`Invalid prefix at index ${i} (expected string)`);
-    }
-    
-    if (typeof details !== 'object' || details === null) {
-      throw new Error(`Invalid mapping details at index ${i} (expected object)`);
-    }
-    
-    if (typeof details.labelType !== 'string') {
-      throw new Error(`Invalid labelType at index ${i} (expected string)`);
-    }
-    
-    if (typeof details.title !== 'string') {
-      throw new Error(`Invalid title at index ${i} (expected string)`);
-    }
-  }
-
-  // Step 5: Ensure all required fields exist with defaults
-  const settings: ExtendedLabelSettings = {
-    ...parsed,
-    barcode1Position: parsed.barcode1Position || createDefaultBarcodePosition(2, 2, 1),
-    barcode2Position: parsed.barcode2Position || createDefaultBarcodePosition(2, 14, 1),
-    globalHorizontalOffset: parsed.globalHorizontalOffset !== undefined ? parsed.globalHorizontalOffset : BigInt(0),
-    globalVerticalOffset: parsed.globalVerticalOffset !== undefined ? parsed.globalVerticalOffset : BigInt(0),
-    calibrationOffsetXmm: typeof parsed.calibrationOffsetXmm === 'number' ? parsed.calibrationOffsetXmm : 0,
-    calibrationOffsetYmm: typeof parsed.calibrationOffsetYmm === 'number' ? parsed.calibrationOffsetYmm : 0,
-  };
-  
-  // Step 6: Validate barcode settings
-  const barcodeError = validateBarcodeSettings(settings);
-  if (barcodeError) {
-    throw new Error(`Settings validation failed: ${barcodeError}`);
-  }
-  
-  return settings;
-}
-
-/**
- * Validate prefix mappings for empty values and duplicates
- * Returns an error message or null if valid
- */
-export function validatePrefixMappings(
-  prefixMappings: Array<[string, { labelType: string; title: string }]>
-): string | null {
-  const prefixes = new Set<string>();
-  
-  for (const [prefix, mapping] of prefixMappings) {
-    if (!prefix.trim()) {
-      return 'All prefix mappings must have a prefix value';
-    }
-    if (!mapping.labelType.trim()) {
-      return 'All prefix mappings must have a label type';
-    }
-    if (!mapping.title.trim()) {
-      return 'All prefix mappings must have a title';
-    }
-    if (prefixes.has(prefix)) {
-      return `Duplicate prefix found: ${prefix}`;
-    }
-    prefixes.add(prefix);
-  }
-  
-  return null;
-}
-
-/**
- * Download settings as a JSON file
- */
-export function downloadSettingsFile(settings: BackendLabelSettings | ExtendedLabelSettings, filename: string = 'label-settings.json') {
-  const jsonString = exportLabelSettings(settings);
-  const blob = new Blob([jsonString], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  
-  URL.revokeObjectURL(url);
-}
-
-/**
- * Read and parse a settings file from user input
- */
-export async function readSettingsFile(file: File): Promise<ExtendedLabelSettings> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      try {
-        const jsonString = e.target?.result as string;
-        const settings = importLabelSettings(jsonString);
-        resolve(settings);
-      } catch (error: any) {
-        reject(error);
-      }
-    };
-    
-    reader.onerror = () => {
-      reject(new Error('Failed to read file'));
-    };
-    
-    reader.readAsText(file);
-  });
 }

@@ -1,12 +1,14 @@
 # Specification
 
 ## Summary
-**Goal:** Fix barcode clipping on printed labels, add a user-adjustable barcode width setting, and enforce unique serial validation in the two-step scan workflow.
+**Goal:** Add a barcode width input field to the Label Settings tab so users can control barcode width when printing labels.
 
 **Planned changes:**
-- Recalculate default barcode width in the CPCL generator to fit within the label's printable area (label width minus left/right margins), preventing barcodes from being clipped at either edge
-- Add a "Barcode Width" numeric input in the Label Settings tab, persisted in the label settings store and applied in the CPCL generator and label preview
-- Include the barcode width setting in settings import/export
-- In the scan-print workflow, when the 2nd barcode is scanned, compare its normalized serial against the 1st; if they match, show an error message, play the existing error sound, clear the 2nd input, and block printing
+- Add a barcode width input control to the Label Settings tab UI, consistent with existing dot-based units
+- Wire the input to read from and write to `labelSettingsStore`, with persistence via localStorage
+- Validate the barcode width value through the existing `barcodeSettingsValidation` utility and display errors on invalid input
+- Update the `LabelPreview` component to reflect barcode width changes in real time
+- Include barcode width in label settings JSON import/export serialization
+- Update the CPCL generator to use the stored barcode width value when generating print commands
 
-**User-visible outcome:** Barcodes print fully within label boundaries without clipping; users can fine-tune barcode width from Label Settings; scanning the same serial twice in the two-step flow triggers an audible error and prevents printing.
+**User-visible outcome:** Users can set a custom barcode width in the Label Settings tab, see it reflected immediately in the label preview, and have it applied when generating CPCL print commands.

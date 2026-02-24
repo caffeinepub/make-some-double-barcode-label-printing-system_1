@@ -1,795 +1,544 @@
-import { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Save, Plus, Trash2, X, Download, Upload, RotateCcw, Printer, Target } from 'lucide-react';
-import { useLabelSettings, updatePersistedSettings, resetSettingsToDefaults, type ExtendedLabelSettings } from '../state/labelSettingsStore';
-import { useLabelSettingsHydration } from '../state/useLabelSettingsHydration';
+import React, { useState, useCallback, useRef } from 'react';
+import { useLabelSettingsStore, DEFAULT_LABEL_SETTINGS } from '../state/labelSettingsStore';
+import { barcodeSettingsValidation, getFieldError } from '../utils/barcodeSettingsValidation';
+import { exportLabelSettings, importLabelSettings } from '../utils/labelSettingsImportExport';
 import LabelPreview from '../printing/LabelPreview';
 import SoundEffectsSettings from '../components/SoundEffectsSettings';
+import { getLabelTypeDisplayName, getMergedLabelTypes } from '../utils/labelTypes';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { getAllLabelTypes, getLabelTypeDisplayName } from '../utils/labelTypes';
-import type { LayoutSettings, BarcodePosition } from '../backend';
-import {
-  downloadSettingsFile,
-  readSettingsFile,
-  validatePrefixMappings,
-} from '../utils/labelSettingsImportExport';
-import { validateBarcodeSettings } from '../utils/barcodeSettingsValidation';
-import { usePrinterService } from '../services/printerService';
-import { generateCPCLWithTitle, generateCalibrationPatternCPCL } from '../printing/cpclGenerator';
-import { addLog } from '../state/logStore';
+import { Download, Upload, RotateCcw, Save, Plus, Trash2, AlertCircle } from 'lucide-react';
+
+const BARCODE_TYPES = ['CODE128', 'CODE39', 'EAN13', 'EAN8', 'UPC-A', 'UPCE', 'I2OF5', 'CODABAR'];
+
+interface PrefixMappingEntry {
+  prefix: string;
+  labelType: string;
+  title: string;
+}
 
 export default function LabelSettingsTab() {
-  const { settings } = useLabelSettings();
-  const hasHydrated = useLabelSettingsHydration();
-  const { isConnected, sendCPCL } = usePrinterService();
-  
-  const [widthMm, setWidthMm] = useState(48);
-  const [heightMm, setHeightMm] = useState(30);
-  const [barcodeType, setBarcodeType] = useState('CODE128');
-  const [barcodeHeight, setBarcodeHeight] = useState(8);
-  const [spacing, setSpacing] = useState(3);
-  const [prefixMappings, setPrefixMappings] = useState<Array<[string, { labelType: string; title: string }]>>([]);
-  
-  // Calibration offsets
-  const [calibrationOffsetXmm, setCalibrationOffsetXmm] = useState(0);
-  const [calibrationOffsetYmm, setCalibrationOffsetYmm] = useState(0);
-  
-  // Global offsets
-  const [globalHorizontalOffset, setGlobalHorizontalOffset] = useState(0);
-  const [globalVerticalOffset, setGlobalVerticalOffset] = useState(0);
-  
-  // Layout settings for each element
-  const [titleLayout, setTitleLayout] = useState<LayoutSettings>({
-    x: BigInt(2),
-    y: BigInt(1),
-    scale: 1.0,
-    width: BigInt(44),
-    height: BigInt(4),
-    fontSize: BigInt(10),
-    verticalSpacing: BigInt(0),
-  });
-  
-  const [barcode1Layout, setBarcode1Layout] = useState<LayoutSettings>({
-    x: BigInt(2),
-    y: BigInt(2),
-    scale: 1.0,
-    width: BigInt(44),
-    height: BigInt(8),
-    fontSize: BigInt(8),
-    verticalSpacing: BigInt(0),
-  });
-  
-  const [serialText1Layout, setSerialText1Layout] = useState<LayoutSettings>({
-    x: BigInt(2),
-    y: BigInt(11),
-    scale: 1.0,
-    width: BigInt(44),
-    height: BigInt(2),
-    fontSize: BigInt(7),
-    verticalSpacing: BigInt(0),
-  });
-  
-  const [barcode2Layout, setBarcode2Layout] = useState<LayoutSettings>({
-    x: BigInt(2),
-    y: BigInt(14),
-    scale: 1.0,
-    width: BigInt(44),
-    height: BigInt(8),
-    fontSize: BigInt(8),
-    verticalSpacing: BigInt(0),
-  });
-  
-  const [serialText2Layout, setSerialText2Layout] = useState<LayoutSettings>({
-    x: BigInt(2),
-    y: BigInt(23),
-    scale: 1.0,
-    width: BigInt(44),
-    height: BigInt(2),
-    fontSize: BigInt(7),
-    verticalSpacing: BigInt(0),
-  });
-  
-  // Barcode positions (these control actual placement)
-  const [barcode1Position, setBarcode1Position] = useState<BarcodePosition>({
-    x: BigInt(2),
-    y: BigInt(2),
-    verticalSpacing: BigInt(1),
-  });
-  
-  const [barcode2Position, setBarcode2Position] = useState<BarcodePosition>({
-    x: BigInt(2),
-    y: BigInt(14),
-    verticalSpacing: BigInt(1),
-  });
-  
-  // Custom label types management
-  const [customTypes, setCustomTypes] = useState<string[]>([]);
-  const [newCustomType, setNewCustomType] = useState('');
-  
-  // File input ref for import
+  const { settings, updateSettings, resetSettings } = useLabelSettingsStore();
+
+  const [newPrefix, setNewPrefix] = useState('');
+  const [newLabelType, setNewLabelType] = useState('');
+  const [newTitle, setNewTitle] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Preview state (lifted from LabelPreview)
-  const [sampleSerial1, setSampleSerial1] = useState('55Y20M1AE00502');
-  const [sampleSerial2, setSampleSerial2] = useState('55Y20M1AE00280');
-  
-  // Test print state
-  const [isPrinting, setIsPrinting] = useState(false);
-  const [isPrintingCalibration, setIsPrintingCalibration] = useState(false);
+  const validationResult = barcodeSettingsValidation(settings);
 
-  useEffect(() => {
-    if (settings) {
-      setWidthMm(Number(settings.widthMm));
-      setHeightMm(Number(settings.heightMm));
-      setBarcodeType(settings.barcodeType);
-      setBarcodeHeight(Number(settings.barcodeHeight));
-      setSpacing(Number(settings.spacing));
-      setPrefixMappings(settings.prefixMappings);
-      setTitleLayout(settings.titleLayout);
-      setBarcode1Layout(settings.barcode1Layout);
-      setSerialText1Layout(settings.serialText1Layout);
-      setBarcode2Layout(settings.barcode2Layout);
-      setSerialText2Layout(settings.serialText2Layout);
-      setBarcode1Position(settings.barcode1Position);
-      setBarcode2Position(settings.barcode2Position);
-      setGlobalHorizontalOffset(Number(settings.globalHorizontalOffset || 0));
-      setGlobalVerticalOffset(Number(settings.globalVerticalOffset || 0));
-      
-      // Load calibration offsets
-      const extendedSettings = settings as ExtendedLabelSettings;
-      setCalibrationOffsetXmm(extendedSettings.calibrationOffsetXmm ?? 0);
-      setCalibrationOffsetYmm(extendedSettings.calibrationOffsetYmm ?? 0);
-    }
-  }, [settings]);
+  const handleNumberInput = useCallback(
+    (field: string, value: string, isFloat = false) => {
+      const parsed = isFloat ? parseFloat(value) : parseInt(value, 10);
+      if (!isNaN(parsed)) {
+        updateSettings({ [field]: parsed } as never);
+      }
+    },
+    [updateSettings]
+  );
 
-  // Compute preview title from current in-tab settings
-  const previewTitle = prefixMappings[0]?.[1]?.title || 'Dual Band';
+  const handleBarcodePositionInput = useCallback(
+    (barcodeKey: 'barcode1Position' | 'barcode2Position', field: string, value: string) => {
+      const parsed = parseFloat(value);
+      if (!isNaN(parsed)) {
+        updateSettings({
+          [barcodeKey]: {
+            ...settings[barcodeKey],
+            [field]: parsed,
+          },
+        });
+      }
+    },
+    [settings, updateSettings]
+  );
 
-  // Build current in-tab settings object for preview and test print
-  const currentSettings: ExtendedLabelSettings = {
-    widthMm: BigInt(widthMm),
-    heightMm: BigInt(heightMm),
-    barcodeType,
-    barcodeHeight: BigInt(barcodeHeight),
-    spacing: BigInt(spacing),
-    prefixMappings,
-    titleLayout,
-    barcode1Layout,
-    serialText1Layout,
-    barcode2Layout,
-    serialText2Layout,
-    barcode1Position,
-    barcode2Position,
-    globalHorizontalOffset: BigInt(globalHorizontalOffset),
-    globalVerticalOffset: BigInt(globalVerticalOffset),
-    calibrationOffsetXmm,
-    calibrationOffsetYmm,
-  };
-
-  const handleSave = async () => {
-    // Validate prefix mappings
-    const prefixError = validatePrefixMappings(prefixMappings);
-    if (prefixError) {
-      toast.error(prefixError);
+  const handleAddPrefix = () => {
+    if (!newPrefix.trim() || !newLabelType.trim() || !newTitle.trim()) {
+      toast.error('Please fill in all prefix mapping fields.');
       return;
     }
-
-    // Validate barcode settings
-    const barcodeError = validateBarcodeSettings(currentSettings);
-    if (barcodeError) {
-      toast.error(barcodeError);
-      return;
-    }
-    
-    // Local-only save: update persisted store directly
-    updatePersistedSettings(currentSettings);
-    toast.success('Settings saved on this device');
+    updateSettings({
+      prefixMappings: {
+        ...settings.prefixMappings,
+        [newPrefix.trim().toUpperCase()]: {
+          labelType: newLabelType.trim(),
+          title: newTitle.trim(),
+        },
+      },
+    });
+    setNewPrefix('');
+    setNewLabelType('');
+    setNewTitle('');
+    toast.success(`Prefix "${newPrefix.trim().toUpperCase()}" added.`);
   };
 
-  const handleResetToDefaults = () => {
-    resetSettingsToDefaults();
-    toast.success('Settings reset to defaults');
+  const handleRemovePrefix = (prefix: string) => {
+    const updated = { ...settings.prefixMappings };
+    delete updated[prefix];
+    updateSettings({ prefixMappings: updated });
+    toast.success(`Prefix "${prefix}" removed.`);
   };
 
   const handleExport = () => {
-    if (!settings) {
-      toast.error('No settings to export');
-      return;
-    }
-    
     try {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-      const filename = `label-settings-${timestamp}.json`;
-      downloadSettingsFile(settings, filename);
-      toast.success('Settings exported successfully');
-    } catch (error: any) {
-      toast.error(`Export failed: ${error.message}`);
-      console.error('Export error:', error);
+      const json = exportLabelSettings(settings);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'label-settings.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success('Settings exported successfully.');
+    } catch {
+      toast.error('Failed to export settings.');
     }
   };
 
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleImportFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
-    
-    try {
-      // Read and parse the file
-      const importedSettings = await readSettingsFile(file);
-      
-      // Validate prefix mappings
-      const prefixError = validatePrefixMappings(importedSettings.prefixMappings);
-      if (prefixError) {
-        toast.error(`Import validation failed: ${prefixError}`);
-        return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const imported = importLabelSettings(ev.target?.result as string);
+        updateSettings(imported);
+        toast.success('Settings imported successfully.');
+      } catch {
+        toast.error('Failed to import settings. Invalid file format.');
       }
-
-      // Validate barcode settings
-      const barcodeError = validateBarcodeSettings(importedSettings);
-      if (barcodeError) {
-        toast.error(`Import validation failed: ${barcodeError}`);
-        return;
-      }
-      
-      // Persist the imported settings
-      updatePersistedSettings(importedSettings);
-      
-      toast.success('Settings imported successfully');
-    } catch (error: any) {
-      toast.error(`Import failed: ${error.message}`);
-      console.error('Import error:', error);
-    } finally {
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
-  const handleTestPrint = async () => {
-    if (!isConnected) {
-      toast.error('No printer connected. Please connect a printer in the Devices tab.');
+  const handleSave = () => {
+    if (!validationResult.valid) {
+      toast.error('Please fix validation errors before saving.');
       return;
     }
-
-    setIsPrinting(true);
-    try {
-      // Generate CPCL with the exact preview values
-      const cpcl = generateCPCLWithTitle(
-        currentSettings,
-        sampleSerial1,
-        sampleSerial2,
-        previewTitle
-      );
-
-      // Send to printer
-      await sendCPCL(cpcl);
-      toast.success('Test label sent to printer');
-    } catch (error: any) {
-      toast.error(`Print failed: ${error.message || 'Unknown error'}`);
-      console.error('Test print error:', error);
-    } finally {
-      setIsPrinting(false);
-    }
+    // Settings are already persisted via Zustand persist middleware on every update.
+    // This button provides explicit user confirmation.
+    toast.success('Settings saved on this device.');
   };
 
-  const handlePrintCalibrationPattern = async () => {
-    if (!isConnected) {
-      toast.error('No printer connected. Please connect a printer in the Devices tab.');
-      return;
-    }
-
-    setIsPrintingCalibration(true);
-    try {
-      // Generate calibration pattern CPCL
-      const cpcl = generateCalibrationPatternCPCL(widthMm, heightMm);
-
-      // Send to printer
-      await sendCPCL(cpcl);
-      
-      addLog('info', 'Calibration pattern printed successfully', {
-        category: 'calibration',
-        widthMm,
-        heightMm,
-      });
-      
-      toast.success('Calibration pattern sent to printer');
-    } catch (error: any) {
-      addLog('error', `Calibration pattern print failed: ${error.message}`, {
-        category: 'calibration',
-        error: error.message,
-      });
-      toast.error(`Print failed: ${error.message || 'Unknown error'}`);
-      console.error('Calibration pattern print error:', error);
-    } finally {
-      setIsPrintingCalibration(false);
-    }
+  const handleReset = () => {
+    resetSettings();
+    toast.info('Settings reset to defaults.');
   };
 
-  const addPrefixMapping = () => {
-    setPrefixMappings([...prefixMappings, ['', { labelType: 'dualBand', title: '' }]]);
-  };
+  const prefixEntries: PrefixMappingEntry[] = Object.entries(settings.prefixMappings).map(
+    ([prefix, mapping]) => ({ prefix, ...mapping })
+  );
 
-  const removePrefixMapping = (index: number) => {
-    setPrefixMappings(prefixMappings.filter((_, i) => i !== index));
-  };
-
-  const updatePrefixMapping = (index: number, field: 'prefix' | 'labelType' | 'title', value: string) => {
-    const updated = [...prefixMappings];
-    if (field === 'prefix') {
-      updated[index] = [value, updated[index][1]];
-    } else {
-      updated[index] = [updated[index][0], { ...updated[index][1], [field]: value }];
-    }
-    setPrefixMappings(updated);
-  };
-
-  const addCustomType = () => {
-    if (newCustomType.trim() && !customTypes.includes(newCustomType.trim())) {
-      setCustomTypes([...customTypes, newCustomType.trim()]);
-      setNewCustomType('');
-      toast.success(`Custom type "${newCustomType.trim()}" added`);
-    }
-  };
-
-  const removeCustomType = (type: string) => {
-    setCustomTypes(customTypes.filter(t => t !== type));
-    toast.success(`Custom type "${type}" removed`);
-  };
-
-  const updateLayoutField = (
-    layout: LayoutSettings,
-    setter: (layout: LayoutSettings) => void,
-    field: keyof LayoutSettings,
-    value: string
-  ) => {
-    const numValue = parseFloat(value);
-    if (isNaN(numValue)) return;
-    
-    if (field === 'scale') {
-      setter({ ...layout, [field]: numValue });
-    } else {
-      setter({ ...layout, [field]: BigInt(Math.round(numValue)) });
-    }
-  };
-
-  const updateBarcodePositionField = (
-    position: BarcodePosition,
-    setter: (position: BarcodePosition) => void,
-    field: keyof BarcodePosition,
-    value: string
-  ) => {
-    const numValue = parseFloat(value);
-    if (isNaN(numValue)) return;
-    
-    setter({ ...position, [field]: BigInt(Math.round(numValue)) });
-  };
-
-  const allLabelTypes = getAllLabelTypes(prefixMappings, customTypes);
-
-  if (!hasHydrated) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-muted-foreground">Loading settings...</div>
-      </div>
-    );
-  }
+  const sampleSerials = ['55Y20M1AE00502', '55Y20M1AE00280'];
+  const sampleTitle =
+    prefixEntries.length > 0 ? prefixEntries[0].title : 'SAMPLE PRODUCT TITLE';
 
   return (
-    <div className="space-y-6 pb-8">
-      {/* Label Preview Section */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Label Preview</CardTitle>
-              <CardDescription>Live preview of your label design (matches printed output exactly)</CardDescription>
-            </div>
-            <Button
-              onClick={handleTestPrint}
-              disabled={!isConnected || isPrinting}
-              className="gap-2"
-            >
-              <Printer className="w-4 h-4" />
-              {isPrinting ? 'Printing...' : 'Print test label'}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <LabelPreview
-            settings={currentSettings}
-            sampleSerial1={sampleSerial1}
-            sampleSerial2={sampleSerial2}
-            previewTitle={previewTitle}
-            onSampleSerial1Change={setSampleSerial1}
-            onSampleSerial2Change={setSampleSerial2}
-          />
-        </CardContent>
-      </Card>
+    <div className="space-y-6 p-4">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h2 className="text-lg font-semibold text-foreground">Label Settings</h2>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={handleExport}>
+            <Download className="w-4 h-4 mr-1" />
+            Export
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+            <Upload className="w-4 h-4 mr-1" />
+            Import
+          </Button>
+          <input ref={fileInputRef} type="file" accept=".json" className="hidden" onChange={handleImport} />
+          <Button variant="outline" size="sm" onClick={handleReset}>
+            <RotateCcw className="w-4 h-4 mr-1" />
+            Reset
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleSave}
+            disabled={!validationResult.valid}
+          >
+            <Save className="w-4 h-4 mr-1" />
+            Save
+          </Button>
+        </div>
+      </div>
 
-      {/* Calibration Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Printer Calibration</CardTitle>
-          <CardDescription>
-            Adjust offsets to align the preview with your physical printer output. These offsets move ALL label elements together.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      {/* Validation errors */}
+      {!validationResult.valid && (
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 space-y-1">
+          {validationResult.errors.map((err) => (
+            <div key={err.field} className="flex items-start gap-2 text-sm text-destructive">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{err.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Tabs defaultValue="label">
+        <TabsList className="w-full">
+          <TabsTrigger value="label" className="flex-1">Label</TabsTrigger>
+          <TabsTrigger value="barcodes" className="flex-1">Barcodes</TabsTrigger>
+          <TabsTrigger value="prefixes" className="flex-1">Prefixes</TabsTrigger>
+          <TabsTrigger value="sound" className="flex-1">Sound</TabsTrigger>
+        </TabsList>
+
+        {/* ── Label Tab ── */}
+        <TabsContent value="label" className="space-y-4 pt-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="calibration-offset-x">X Offset (mm) - Moves Everything</Label>
+            <div className="space-y-1">
+              <Label>Width (mm)</Label>
               <Input
-                id="calibration-offset-x"
                 type="number"
-                step="0.1"
-                value={calibrationOffsetXmm}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  setCalibrationOffsetXmm(isNaN(val) ? 0 : val);
-                }}
-                className="font-mono"
+                value={settings.widthMm}
+                onChange={(e) => handleNumberInput('widthMm', e.target.value)}
+                min={20}
+                max={200}
               />
-              <p className="text-xs text-muted-foreground">
-                Positive = right, negative = left. Affects both barcodes and all text.
-              </p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="calibration-offset-y">Y Offset (mm) - Moves Everything</Label>
+            <div className="space-y-1">
+              <Label>Height (mm)</Label>
               <Input
-                id="calibration-offset-y"
                 type="number"
-                step="0.1"
-                value={calibrationOffsetYmm}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  setCalibrationOffsetYmm(isNaN(val) ? 0 : val);
-                }}
-                className="font-mono"
+                value={settings.heightMm}
+                onChange={(e) => handleNumberInput('heightMm', e.target.value)}
+                min={10}
+                max={200}
               />
-              <p className="text-xs text-muted-foreground">
-                Positive = down, negative = up. Affects both barcodes and all text.
-              </p>
             </div>
           </div>
-          
-          <div className="flex items-center gap-2 pt-2">
-            <Button
-              onClick={handlePrintCalibrationPattern}
-              disabled={!isConnected || isPrintingCalibration}
-              variant="outline"
-              className="gap-2"
-            >
-              <Target className="w-4 h-4" />
-              {isPrintingCalibration ? 'Printing...' : 'Print calibration pattern'}
-            </Button>
-            <p className="text-xs text-muted-foreground">
-              Prints a border and crosshair to help identify printer offset
-            </p>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Barcode Positions Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Barcode Positions</CardTitle>
-          <CardDescription>
-            Control where each barcode appears and the spacing between barcode and its serial text
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Primary Barcode Position */}
-          <div className="space-y-4">
-            <h4 className="font-semibold text-sm">Primary Barcode (Top)</h4>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="barcode1-pos-x">X Position (mm)</Label>
-                <Input
-                  id="barcode1-pos-x"
-                  type="number"
-                  step="0.5"
-                  value={Number(barcode1Position.x)}
-                  onChange={(e) => updateBarcodePositionField(barcode1Position, setBarcode1Position, 'x', e.target.value)}
-                  className="font-mono"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="barcode1-pos-y">Y Position (mm)</Label>
-                <Input
-                  id="barcode1-pos-y"
-                  type="number"
-                  step="0.5"
-                  value={Number(barcode1Position.y)}
-                  onChange={(e) => updateBarcodePositionField(barcode1Position, setBarcode1Position, 'y', e.target.value)}
-                  className="font-mono"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="barcode1-spacing">Text Spacing (mm)</Label>
-                <Input
-                  id="barcode1-spacing"
-                  type="number"
-                  step="0.5"
-                  value={Number(barcode1Position.verticalSpacing)}
-                  onChange={(e) => updateBarcodePositionField(barcode1Position, setBarcode1Position, 'verticalSpacing', e.target.value)}
-                  className="font-mono"
-                />
-                <p className="text-xs text-muted-foreground">Gap between barcode and serial text</p>
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label>Title Font Size (mm)</Label>
+              <Input
+                type="number"
+                value={settings.titleFontSize}
+                onChange={(e) => handleNumberInput('titleFontSize', e.target.value, true)}
+                min={1}
+                max={10}
+                step={0.5}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Serial Font Size (mm)</Label>
+              <Input
+                type="number"
+                value={settings.serialFontSize}
+                onChange={(e) => handleNumberInput('serialFontSize', e.target.value, true)}
+                min={1}
+                max={8}
+                step={0.5}
+              />
+            </div>
+          </div>
+
+          <Separator />
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+            Calibration Offsets (move all elements)
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label>Vertical Offset (mm)</Label>
+              <Input
+                type="number"
+                value={settings.globalVerticalOffsetMm}
+                onChange={(e) => handleNumberInput('globalVerticalOffsetMm', e.target.value, true)}
+                step={0.5}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Horizontal Offset (mm)</Label>
+              <Input
+                type="number"
+                value={settings.globalHorizontalOffsetMm}
+                onChange={(e) => handleNumberInput('globalHorizontalOffsetMm', e.target.value, true)}
+                step={0.5}
+              />
+            </div>
+          </div>
+
+          {/* Preview */}
+          <Separator />
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Preview</p>
+          <div className="flex justify-center overflow-x-auto py-2">
+            <LabelPreview
+              leftSerial={sampleSerials[0]}
+              rightSerial={sampleSerials[1]}
+              title={sampleTitle}
+            />
+          </div>
+        </TabsContent>
+
+        {/* ── Barcodes Tab ── */}
+        <TabsContent value="barcodes" className="space-y-4 pt-4">
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+            Barcode Type &amp; Dimensions
+          </p>
+
+          <div className="space-y-1">
+            <Label>Barcode Type</Label>
+            <select
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              value={settings.barcodeType}
+              onChange={(e) => updateSettings({ barcodeType: e.target.value })}
+            >
+              {BARCODE_TYPES.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label>Barcode Height (mm)</Label>
+              <Input
+                type="number"
+                value={settings.barcodeHeight}
+                onChange={(e) => handleNumberInput('barcodeHeight', e.target.value, true)}
+                min={5}
+                max={30}
+                step={0.5}
+              />
+              {getFieldError(validationResult, 'barcodeHeight') && (
+                <p className="text-xs text-destructive">
+                  {getFieldError(validationResult, 'barcodeHeight')}
+                </p>
+              )}
+            </div>
+
+            {/* Barcode Width */}
+            <div className="space-y-1">
+              <Label>Barcode Width (dots)</Label>
+              <Input
+                type="number"
+                value={settings.barcodeWidth ?? 2}
+                onChange={(e) => handleNumberInput('barcodeWidth', e.target.value)}
+                min={1}
+                max={10}
+                step={1}
+              />
+              {getFieldError(validationResult, 'barcodeWidth') && (
+                <p className="text-xs text-destructive">
+                  {getFieldError(validationResult, 'barcodeWidth')}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Controls bar thickness (1–10 dots). Default: 2.
+              </p>
             </div>
           </div>
 
           <Separator />
 
-          {/* Secondary Barcode Position */}
-          <div className="space-y-4">
-            <h4 className="font-semibold text-sm">Secondary Barcode (Middle)</h4>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="barcode2-pos-x">X Position (mm)</Label>
+          {/* Barcode Positions */}
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+            Barcode Positions
+          </p>
+
+          {/* Barcode 1 */}
+          <div className="rounded-md border border-border p-3 space-y-3">
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">Barcode 1</Badge>
+              <span className="text-xs text-muted-foreground">(left / primary serial)</span>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label>X (mm)</Label>
                 <Input
-                  id="barcode2-pos-x"
                   type="number"
-                  step="0.5"
-                  value={Number(barcode2Position.x)}
-                  onChange={(e) => updateBarcodePositionField(barcode2Position, setBarcode2Position, 'x', e.target.value)}
-                  className="font-mono"
+                  value={settings.barcode1Position.xMm}
+                  onChange={(e) => handleBarcodePositionInput('barcode1Position', 'xMm', e.target.value)}
+                  step={0.5}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="barcode2-pos-y">Y Position (mm)</Label>
+              <div className="space-y-1">
+                <Label>Y (mm)</Label>
                 <Input
-                  id="barcode2-pos-y"
                   type="number"
-                  step="0.5"
-                  value={Number(barcode2Position.y)}
-                  onChange={(e) => updateBarcodePositionField(barcode2Position, setBarcode2Position, 'y', e.target.value)}
-                  className="font-mono"
+                  value={settings.barcode1Position.yMm}
+                  onChange={(e) => handleBarcodePositionInput('barcode1Position', 'yMm', e.target.value)}
+                  step={0.5}
                 />
+                {getFieldError(validationResult, 'barcode1Position.yMm') && (
+                  <p className="text-xs text-destructive">
+                    {getFieldError(validationResult, 'barcode1Position.yMm')}
+                  </p>
+                )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="barcode2-spacing">Text Spacing (mm)</Label>
+              <div className="space-y-1">
+                <Label>Text Gap (mm)</Label>
                 <Input
-                  id="barcode2-spacing"
                   type="number"
-                  step="0.5"
-                  value={Number(barcode2Position.verticalSpacing)}
-                  onChange={(e) => updateBarcodePositionField(barcode2Position, setBarcode2Position, 'verticalSpacing', e.target.value)}
-                  className="font-mono"
+                  value={settings.barcode1Position.textSpacingMm}
+                  onChange={(e) =>
+                    handleBarcodePositionInput('barcode1Position', 'textSpacingMm', e.target.value)
+                  }
+                  step={0.5}
+                  min={0}
                 />
-                <p className="text-xs text-muted-foreground">Gap between barcode and serial text</p>
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Label Dimensions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Label Dimensions</CardTitle>
-          <CardDescription>Configure the physical size of your labels</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="width">Width (mm)</Label>
-              <Input
-                id="width"
-                type="number"
-                value={widthMm}
-                onChange={(e) => setWidthMm(parseInt(e.target.value) || 48)}
-              />
+          {/* Barcode 2 */}
+          <div className="rounded-md border border-border p-3 space-y-3">
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">Barcode 2</Badge>
+              <span className="text-xs text-muted-foreground">(right / secondary serial)</span>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="height">Height (mm)</Label>
-              <Input
-                id="height"
-                type="number"
-                value={heightMm}
-                onChange={(e) => setHeightMm(parseInt(e.target.value) || 30)}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Barcode Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Barcode Settings</CardTitle>
-          <CardDescription>Configure barcode type and dimensions</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="barcode-type">Barcode Type</Label>
-              <Select value={barcodeType} onValueChange={setBarcodeType}>
-                <SelectTrigger id="barcode-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="CODE128">CODE128</SelectItem>
-                  <SelectItem value="CODE39">CODE39</SelectItem>
-                  <SelectItem value="EAN13">EAN13</SelectItem>
-                  <SelectItem value="UPCA">UPC-A</SelectItem>
-                  <SelectItem value="QR">QR Code</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="barcode-height">Barcode Height (mm)</Label>
-              <Input
-                id="barcode-height"
-                type="number"
-                value={barcodeHeight}
-                onChange={(e) => setBarcodeHeight(parseInt(e.target.value) || 8)}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Prefix Mappings */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Prefix Mappings</CardTitle>
-          <CardDescription>Map serial number prefixes to label types and titles</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {prefixMappings.map(([prefix, mapping], index) => (
-            <div key={index} className="flex gap-2 items-end">
-              <div className="flex-1 space-y-2">
-                <Label htmlFor={`prefix-${index}`}>Prefix</Label>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label>X (mm)</Label>
                 <Input
-                  id={`prefix-${index}`}
-                  value={prefix}
-                  onChange={(e) => updatePrefixMapping(index, 'prefix', e.target.value)}
-                  placeholder="e.g., SSV"
-                  className="font-mono"
+                  type="number"
+                  value={settings.barcode2Position.xMm}
+                  onChange={(e) => handleBarcodePositionInput('barcode2Position', 'xMm', e.target.value)}
+                  step={0.5}
                 />
               </div>
-              <div className="flex-1 space-y-2">
-                <Label htmlFor={`label-type-${index}`}>Label Type</Label>
-                <Select
-                  value={mapping.labelType}
-                  onValueChange={(value) => updatePrefixMapping(index, 'labelType', value)}
-                >
-                  <SelectTrigger id={`label-type-${index}`}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allLabelTypes.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.displayName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex-1 space-y-2">
-                <Label htmlFor={`title-${index}`}>Title</Label>
+              <div className="space-y-1">
+                <Label>Y (mm)</Label>
                 <Input
-                  id={`title-${index}`}
-                  value={mapping.title}
-                  onChange={(e) => updatePrefixMapping(index, 'title', e.target.value)}
-                  placeholder="e.g., Dual Band"
+                  type="number"
+                  value={settings.barcode2Position.yMm}
+                  onChange={(e) => handleBarcodePositionInput('barcode2Position', 'yMm', e.target.value)}
+                  step={0.5}
+                />
+                {getFieldError(validationResult, 'barcode2Position.yMm') && (
+                  <p className="text-xs text-destructive">
+                    {getFieldError(validationResult, 'barcode2Position.yMm')}
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1">
+                <Label>Text Gap (mm)</Label>
+                <Input
+                  type="number"
+                  value={settings.barcode2Position.textSpacingMm}
+                  onChange={(e) =>
+                    handleBarcodePositionInput('barcode2Position', 'textSpacingMm', e.target.value)
+                  }
+                  step={0.5}
+                  min={0}
                 />
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => removePrefixMapping(index)}
-                className="flex-shrink-0"
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
             </div>
-          ))}
-          <Button onClick={addPrefixMapping} variant="outline" className="w-full gap-2">
-            <Plus className="w-4 h-4" />
-            Add Prefix Mapping
-          </Button>
-        </CardContent>
-      </Card>
+          </div>
 
-      {/* Custom Label Types */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Custom Label Types</CardTitle>
-          <CardDescription>Add custom label types for your prefix mappings</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              value={newCustomType}
-              onChange={(e) => setNewCustomType(e.target.value)}
-              placeholder="Enter custom type name"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addCustomType();
-                }
-              }}
+          {/* Spacing overlap warning */}
+          {validationResult.errors.some((e) => e.message.includes('too close')) && (
+            <p className="text-xs text-destructive">
+              {validationResult.errors.find((e) => e.message.includes('too close'))?.message}
+            </p>
+          )}
+
+          {/* Preview */}
+          <Separator />
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Preview</p>
+          <div className="flex justify-center overflow-x-auto py-2">
+            <LabelPreview
+              leftSerial={sampleSerials[0]}
+              rightSerial={sampleSerials[1]}
+              title={sampleTitle}
             />
-            <Button onClick={addCustomType} className="gap-2">
-              <Plus className="w-4 h-4" />
-              Add
-            </Button>
           </div>
-          {customTypes.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {customTypes.map((type) => (
-                <Badge key={type} variant="secondary" className="gap-2">
-                  {type}
-                  <button
-                    onClick={() => removeCustomType(type)}
-                    className="hover:text-destructive"
+        </TabsContent>
+
+        {/* ── Prefixes Tab ── */}
+        <TabsContent value="prefixes" className="space-y-4 pt-4">
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+            Prefix → Label Type Mappings
+          </p>
+
+          {prefixEntries.length === 0 ? (
+            <p className="text-sm text-muted-foreground italic">No prefix mappings configured.</p>
+          ) : (
+            <div className="space-y-2">
+              {prefixEntries.map((entry) => (
+                <div
+                  key={entry.prefix}
+                  className="flex items-center gap-2 rounded-md border border-border p-2"
+                >
+                  <Badge variant="outline" className="font-mono shrink-0">
+                    {entry.prefix}
+                  </Badge>
+                  <span className="text-sm flex-1 truncate">
+                    {entry.title}{' '}
+                    <span className="text-muted-foreground">
+                      ({getLabelTypeDisplayName(entry.labelType)})
+                    </span>
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0 text-destructive hover:text-destructive"
+                    onClick={() => handleRemovePrefix(entry.prefix)}
                   >
-                    <X className="w-3 h-3" />
-                  </button>
-                </Badge>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
 
-      {/* Sound Effects */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Sound Effects</CardTitle>
-          <CardDescription>Configure audio feedback for scanning and printing events</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <SoundEffectsSettings />
-        </CardContent>
-      </Card>
-
-      {/* Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Actions</CardTitle>
-          <CardDescription>Save, export, import, or reset your settings</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={handleSave} className="gap-2">
-              <Save className="w-4 h-4" />
-              Save Settings
-            </Button>
-            <Button onClick={handleExport} variant="outline" className="gap-2">
-              <Download className="w-4 h-4" />
-              Export Settings
-            </Button>
-            <Button onClick={handleImportClick} variant="outline" className="gap-2">
-              <Upload className="w-4 h-4" />
-              Import Settings
-            </Button>
-            <Button onClick={handleResetToDefaults} variant="destructive" className="gap-2">
-              <RotateCcw className="w-4 h-4" />
-              Reset to Defaults
+          <Separator />
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+            Add New Mapping
+          </p>
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label>Prefix</Label>
+                <Input
+                  placeholder="e.g. 55Y"
+                  value={newPrefix}
+                  onChange={(e) => setNewPrefix(e.target.value.toUpperCase())}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Label Type</Label>
+                <Input
+                  placeholder="e.g. dualBand"
+                  value={newLabelType}
+                  onChange={(e) => setNewLabelType(e.target.value)}
+                  list="label-type-suggestions"
+                />
+                <datalist id="label-type-suggestions">
+                  {getMergedLabelTypes(settings.prefixMappings).map((t) => (
+                    <option key={t.id} value={t.value} />
+                  ))}
+                </datalist>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Title</Label>
+              <Input
+                placeholder="e.g. DUAL BAND ROUTER"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+              />
+            </div>
+            <Button onClick={handleAddPrefix} className="w-full">
+              <Plus className="w-4 h-4 mr-1" />
+              Add Mapping
             </Button>
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            onChange={handleImportFile}
-            className="hidden"
-          />
-        </CardContent>
-      </Card>
+        </TabsContent>
+
+        {/* ── Sound Tab ── */}
+        <TabsContent value="sound" className="pt-4">
+          <SoundEffectsSettings />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

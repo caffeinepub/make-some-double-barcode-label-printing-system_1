@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLabelSettings } from './labelSettingsStore';
+import { useLabelSettingsStore } from './labelSettingsStore';
 
 /**
  * Hook that tracks whether the label settings store has finished hydrating from localStorage.
@@ -10,12 +10,12 @@ export function useLabelSettingsHydration() {
 
   useEffect(() => {
     // Subscribe to the store's persist rehydration
-    const unsubscribe = useLabelSettings.persist.onFinishHydration(() => {
+    const unsubscribe = useLabelSettingsStore.persist.onFinishHydration(() => {
       setHasHydrated(true);
     });
 
     // Check if already hydrated (in case subscription happens after hydration)
-    if (useLabelSettings.persist.hasHydrated()) {
+    if (useLabelSettingsStore.persist.hasHydrated()) {
       setHasHydrated(true);
     }
 

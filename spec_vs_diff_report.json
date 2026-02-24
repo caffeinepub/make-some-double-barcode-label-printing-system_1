@@ -1,37 +1,25 @@
 {
   "kind": "spec_vs_diff_report",
   "version": "1.0",
-  "generatedAt": "2026-02-24T21:47:39.229Z",
-  "summary": "The diff only modifies project_state.json, which is a metadata/tracking file that records feature requests as 'pending'. None of the actual implementation files (cpclGenerator.ts, cpclLayoutAdjustments.ts, LabelSettingsTab.tsx, labelSettingsStore.ts, ScanPrintTab.tsx, soundSystem.ts) were modified. All three requirements are entirely unimplemented.",
-  "missing_requirements": [
-    {
-      "id": "REQ-1",
-      "requirement": "Reduce the default barcode width in the CPCL generator so that both barcodes fit fully within the printable area of the label without being clipped on either side, enforcing a safe maximum width based on label dimensions minus left/right margins.",
-      "reason": "No changes were made to cpclGenerator.ts or cpclLayoutAdjustments.ts. The feature is only recorded as 'pending' in project_state.json.",
-      "evidence": [
-        "project_state.json"
-      ]
-    },
-    {
-      "id": "REQ-2",
-      "requirement": "Add a 'Barcode Width' numeric input control in LabelSettingsTab.tsx, persist it in labelSettingsStore.ts, apply it in cpclGenerator.ts, reflect it in label preview, and include it in settings import/export.",
-      "reason": "No changes were made to LabelSettingsTab.tsx, labelSettingsStore.ts, or cpclGenerator.ts. The feature is only recorded as 'pending' in project_state.json.",
-      "evidence": [
-        "project_state.json"
-      ]
-    },
-    {
-      "id": "REQ-3",
-      "requirement": "In ScanPrintTab.tsx, compare the 2nd scanned serial against the 1st; if identical, show an error message, play error sound via soundSystem.ts, clear the 2nd input, and prevent printing.",
-      "reason": "No changes were made to ScanPrintTab.tsx or soundSystem.ts. The feature is only recorded as 'pending' in project_state.json.",
-      "evidence": [
-        "project_state.json"
-      ]
-    }
-  ],
+  "generatedAt": "2026-02-24T22:26:13.834Z",
+  "summary": "The diff implements all aspects of REQ-1: barcode width field added to LabelSettingsTab UI, barcodeWidth field added to labelSettingsStore with localStorage persistence and migration, barcodeSettingsValidation updated to validate barcodeWidth (1-10 dots), LabelPreview updated to use barcodeWidth, cpclGenerator updated to use barcodeWidth, and labelSettingsImportExport updated to include barcodeWidth in serialization/deserialization.",
+  "missing_requirements": [],
   "hallucinated_features": [],
-  "confidence": 0.98,
+  "confidence": 0.92,
   "changed_files": [
+    "frontend-file-summaries.txt",
+    "frontend/src/components/SerialTypeCounters.tsx",
+    "frontend/src/printing/LabelPreview.tsx",
+    "frontend/src/printing/barcodePreview.ts",
+    "frontend/src/printing/cpclGenerator.ts",
+    "frontend/src/services/printerService.ts",
+    "frontend/src/state/labelSettingsStore.ts",
+    "frontend/src/state/useLabelSettingsHydration.ts",
+    "frontend/src/tabs/LabelSettingsTab.tsx",
+    "frontend/src/tabs/ScanPrintTab.tsx",
+    "frontend/src/utils/barcodeSettingsValidation.ts",
+    "frontend/src/utils/labelSettingsImportExport.ts",
+    "frontend/src/utils/labelTypes.ts",
     "project_state.json"
   ]
 }

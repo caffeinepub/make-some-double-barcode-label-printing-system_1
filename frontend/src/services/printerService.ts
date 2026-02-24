@@ -38,15 +38,12 @@ export const usePrinterService = create<PrinterState>()(
 
         try {
           if (method === 'usb') {
-            // Check WebUSB support
             if (!isWebUSBSupported()) {
               throw new Error('WebUSB is not supported in this browser. Please use Chrome, Edge, or Opera.');
             }
 
-            // Request USB printer
             const device = await requestUSBPrinter();
             if (!device) {
-              // User cancelled
               set({ isConnecting: false });
               return;
             }
@@ -127,20 +124,19 @@ export const usePrinterService = create<PrinterState>()(
           category: 'printer',
         });
 
-        // Get current settings or use safe defaults
         const settings = getCurrentSettings();
+        const prefixKeys = Object.keys(settings.prefixMappings);
 
-        if (!settings || settings.prefixMappings.length === 0) {
-          // Use the shared test print generator with correct BARCODE syntax
+        if (!settings || prefixKeys.length === 0) {
           const testCPCL = generateTestPrintCPCL();
           await sendCPCL(testCPCL);
         } else {
-          // Generate a test label using current settings with real barcode generation
+          const firstPrefix = prefixKeys[0];
           const testCPCL = generateCPCL(
             settings,
             'TEST-SERIAL-001',
             'TEST-SERIAL-002',
-            settings.prefixMappings[0]?.[0] || 'TEST'
+            firstPrefix
           );
           await sendCPCL(testCPCL);
         }
@@ -153,7 +149,7 @@ export const usePrinterService = create<PrinterState>()(
     {
       name: 'printer-service',
       partialize: (state) => ({
-        isConnected: false, // Don't persist connection state
+        isConnected: false,
         connectionMethod: state.connectionMethod,
       }),
     }

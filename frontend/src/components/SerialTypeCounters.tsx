@@ -1,14 +1,16 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Printer } from 'lucide-react';
 import { useDiagnostics } from '../state/diagnosticsStore';
-import { useLabelSettings } from '../state/labelSettingsStore';
+import { useLabelSettingsStore } from '../state/labelSettingsStore';
 
 export default function SerialTypeCounters() {
   const { typeCounters } = useDiagnostics();
-  const { settings } = useLabelSettings();
+  const { settings } = useLabelSettingsStore();
+
+  const prefixEntries = Object.entries(settings.prefixMappings);
 
   // Empty state - no prefix mappings configured
-  if (!settings || settings.prefixMappings.length === 0) {
+  if (prefixEntries.length === 0) {
     return (
       <Card className="border-2 border-dashed">
         <CardContent className="py-8">
@@ -22,16 +24,11 @@ export default function SerialTypeCounters() {
     );
   }
 
-  // Create a map of prefix mappings for easy lookup
-  const mappingsMap = new Map(settings.prefixMappings);
-
   // Build counter cards for each configured prefix mapping
-  const counterCards = Array.from(mappingsMap.entries()).map(([prefix, mapping]) => {
+  const counterCards = prefixEntries.map(([prefix, mapping]) => {
     const key = `${prefix}:${mapping.labelType}`;
     const counter = typeCounters[key];
     const printCount = counter?.prints ?? 0;
-
-    // Use mapping title if available, otherwise fall back to labelType
     const displayTitle = mapping.title || mapping.labelType || prefix;
 
     return {

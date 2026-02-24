@@ -1,54 +1,57 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-24T21:47:39.232Z",
+  "generatedAt": "2026-02-24T22:26:13.837Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 3,
-    "implemented": 0,
+    "total": 1,
+    "implemented": 1,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Reduce the default barcode width in the CPCL generator so that both barcodes fit fully within the printable area of the label without being clipped on either side. Reference cpclGenerator.ts and cpclLayoutAdjustments.ts to tighten the width calculation and enforce a safe maximum width based on label dimensions minus left/right margins.",
-        "status": "missing",
-        "plannedFiles": [
-          "frontend/src/printing/cpclGenerator.ts",
-          "frontend/src/printing/cpclLayoutAdjustments.ts"
-        ],
-        "matchedFiles": []
-      },
-      {
-        "id": "REQ-2",
-        "summary": "Add a 'Barcode Width' numeric input control in the Label Settings tab (LabelSettingsTab.tsx) that allows the user to fine-tune the barcode width value. This setting must be persisted in the label settings store (labelSettingsStore.ts) alongside existing barcode layout fields, and must be applied when generating CPCL commands in cpclGenerator.ts.",
-        "status": "missing",
+        "summary": "Add a barcode width input field to the Label Settings tab UI. The field should allow users to adjust the barcode width (in dots or appropriate unit consistent with existing settings). It must read from and write to the labelSettingsStore, be validated via barcodeSettingsValidation, and be reflected live in the LabelPreview component.",
+        "status": "implemented",
         "plannedFiles": [
           "frontend/src/state/labelSettingsStore.ts",
           "frontend/src/tabs/LabelSettingsTab.tsx",
+          "frontend/src/utils/barcodeSettingsValidation.ts",
+          "frontend/src/printing/LabelPreview.tsx",
+          "frontend/src/printing/barcodePreview.ts",
           "frontend/src/printing/cpclGenerator.ts",
-          "frontend/src/utils/labelSettingsImportExport.ts",
-          "frontend/src/printing/LabelPreview.tsx"
+          "frontend/src/utils/labelSettingsImportExport.ts"
         ],
-        "matchedFiles": []
-      },
-      {
-        "id": "REQ-3",
-        "summary": "In the two-step scan workflow (ScanPrintTab.tsx), when the user scans the 2nd barcode, compare its normalized serial value against the already-scanned 1st serial. If they are identical, display a visible error message stating the two serials must be unique, play the error sound using the existing sound system (soundSystem.ts), and clear the 2nd input so the user can re-scan. Do not proceed to print when this duplicate condition is detected.",
-        "status": "missing",
-        "plannedFiles": [
-          "frontend/src/tabs/ScanPrintTab.tsx"
-        ],
-        "matchedFiles": []
+        "matchedFiles": [
+          "frontend/src/state/labelSettingsStore.ts",
+          "frontend/src/tabs/LabelSettingsTab.tsx",
+          "frontend/src/utils/barcodeSettingsValidation.ts",
+          "frontend/src/printing/LabelPreview.tsx",
+          "frontend/src/printing/barcodePreview.ts",
+          "frontend/src/printing/cpclGenerator.ts",
+          "frontend/src/utils/labelSettingsImportExport.ts"
+        ]
       }
     ]
   },
   "changedFiles": [
     "build-request.json",
-    "caffeine.lock.json",
     "feature_evidence.json",
+    "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
+    "frontend/src/components/SerialTypeCounters.tsx",
+    "frontend/src/printing/LabelPreview.tsx",
+    "frontend/src/printing/barcodePreview.ts",
+    "frontend/src/printing/cpclGenerator.ts",
+    "frontend/src/services/printerService.ts",
+    "frontend/src/state/labelSettingsStore.ts",
+    "frontend/src/state/useLabelSettingsHydration.ts",
+    "frontend/src/tabs/LabelSettingsTab.tsx",
+    "frontend/src/tabs/ScanPrintTab.tsx",
+    "frontend/src/utils/barcodeSettingsValidation.ts",
+    "frontend/src/utils/labelSettingsImportExport.ts",
+    "frontend/src/utils/labelTypes.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",
