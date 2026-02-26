@@ -1,57 +1,66 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-24T22:26:13.837Z",
+  "generatedAt": "2026-02-26T20:55:19.030Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 1,
-    "implemented": 1,
+    "total": 2,
+    "implemented": 0,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Add a barcode width input field to the Label Settings tab UI. The field should allow users to adjust the barcode width (in dots or appropriate unit consistent with existing settings). It must read from and write to the labelSettingsStore, be validated via barcodeSettingsValidation, and be reflected live in the LabelPreview component.",
-        "status": "implemented",
+        "summary": "Investigate and resolve the recurring production deployment error. Audit the backend Motoko actor (backend/main.mo) for any syntax errors, type mismatches, or unstable type issues that would cause the canister build or upgrade to fail. Ensure the actor compiles cleanly and all stable variable declarations are valid.",
+        "status": "unknown",
+        "plannedFiles": [],
+        "matchedFiles": []
+      },
+      {
+        "id": "REQ-2",
+        "summary": "Audit the frontend build configuration (vite config, tsconfig, tailwind config, index.html, package.json) for any issues that would cause the production build to fail — such as missing environment variables, broken imports, type errors, or invalid asset references. Ensure the frontend builds cleanly for production.",
+        "status": "missing",
         "plannedFiles": [
-          "frontend/src/state/labelSettingsStore.ts",
+          "frontend/package.json",
+          "frontend/vite.config.ts",
+          "frontend/tsconfig.json",
+          "frontend/tailwind.config.js",
+          "frontend/index.html",
+          "frontend/src/main.tsx",
+          "frontend/src/App.tsx",
+          "frontend/src/backend.d.ts",
+          "frontend/index.css",
+          "frontend/src/hooks/useActor.ts",
+          "frontend/src/hooks/useInternetIdentity.ts",
+          "frontend/src/components/AppShell.tsx",
+          "frontend/src/tabs/ScanPrintTab.tsx",
           "frontend/src/tabs/LabelSettingsTab.tsx",
-          "frontend/src/utils/barcodeSettingsValidation.ts",
-          "frontend/src/printing/LabelPreview.tsx",
-          "frontend/src/printing/barcodePreview.ts",
+          "frontend/src/tabs/DevicesTab.tsx",
+          "frontend/src/tabs/DiagnosticsTab.tsx",
           "frontend/src/printing/cpclGenerator.ts",
-          "frontend/src/utils/labelSettingsImportExport.ts"
+          "frontend/src/printing/LabelPreview.tsx",
+          "frontend/src/services/printerService.ts",
+          "frontend/src/services/usbCpclTransport.ts",
+          "frontend/src/state/labelSettingsStore.ts",
+          "frontend/src/state/diagnosticsStore.ts",
+          "frontend/src/state/printHistoryStore.ts",
+          "frontend/src/utils/labelSettingsImportExport.ts",
+          "frontend/src/utils/barcodeSettingsValidation.ts",
+          "frontend/src/utils/icErrors.ts",
+          "frontend/.env.production"
         ],
-        "matchedFiles": [
-          "frontend/src/state/labelSettingsStore.ts",
-          "frontend/src/tabs/LabelSettingsTab.tsx",
-          "frontend/src/utils/barcodeSettingsValidation.ts",
-          "frontend/src/printing/LabelPreview.tsx",
-          "frontend/src/printing/barcodePreview.ts",
-          "frontend/src/printing/cpclGenerator.ts",
-          "frontend/src/utils/labelSettingsImportExport.ts"
-        ]
+        "matchedFiles": []
       }
     ]
   },
   "changedFiles": [
+    "backend/main.mo",
     "build-request.json",
+    "build-template/README.md",
+    "caffeine.lock.json",
     "feature_evidence.json",
-    "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
-    "frontend/src/components/SerialTypeCounters.tsx",
-    "frontend/src/printing/LabelPreview.tsx",
-    "frontend/src/printing/barcodePreview.ts",
-    "frontend/src/printing/cpclGenerator.ts",
-    "frontend/src/services/printerService.ts",
-    "frontend/src/state/labelSettingsStore.ts",
-    "frontend/src/state/useLabelSettingsHydration.ts",
-    "frontend/src/tabs/LabelSettingsTab.tsx",
-    "frontend/src/tabs/ScanPrintTab.tsx",
-    "frontend/src/utils/barcodeSettingsValidation.ts",
-    "frontend/src/utils/labelSettingsImportExport.ts",
-    "frontend/src/utils/labelTypes.ts",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

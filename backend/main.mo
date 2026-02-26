@@ -1,5 +1,4 @@
 import Map "mo:core/Map";
-import Array "mo:core/Array";
 import Time "mo:core/Time";
 import Order "mo:core/Order";
 import Text "mo:core/Text";
@@ -9,8 +8,6 @@ import Int "mo:core/Int";
 
 import MixinAuthorization "authorization/MixinAuthorization";
 import AccessControl "authorization/access-control";
-
-
 
 actor {
   public type PrefixMapping = {
@@ -67,6 +64,17 @@ actor {
     name : Text;
   };
 
+  func comparePrintJobByTimestamp(a : PrintJob, b : PrintJob) : Order.Order {
+    Int.compare(b.timestamp, a.timestamp);
+  };
+
+  func comparePrintJobByLabelType(a : PrintJob, b : PrintJob) : Order.Order {
+    switch (Text.compare(a.labelType, b.labelType)) {
+      case (#equal) { Int.compare(b.timestamp, a.timestamp) };
+      case (order) { order };
+    };
+  };
+
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
@@ -76,6 +84,40 @@ actor {
   var currentId = 0;
 
   let labelSettings = Map.empty<Principal, LabelSettings>();
+
+  let defaultLayout : LayoutSettings = {
+    x = 0;
+    y = 0;
+    scale = 1.0;
+    width = 0;
+    height = 0;
+    fontSize = 12;
+    verticalSpacing = 0;
+  };
+
+  let defaultPosition : BarcodePosition = {
+    x = 0;
+    y = 0;
+    verticalSpacing = 0;
+  };
+
+  let defaultLabelSettings : LabelSettings = {
+    widthMm = 58;
+    heightMm = 43;
+    barcodeType = "CODE128";
+    barcodeHeight = 10;
+    spacing = 5;
+    prefixMappings = [];
+    titleLayout = defaultLayout;
+    barcode1Layout = defaultLayout;
+    serialText1Layout = defaultLayout;
+    barcode2Layout = defaultLayout;
+    serialText2Layout = defaultLayout;
+    barcode1Position = defaultPosition;
+    barcode2Position = defaultPosition;
+    globalVerticalOffset = 0;
+    globalHorizontalOffset = 0;
+  };
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
@@ -110,46 +152,12 @@ actor {
       Runtime.trap("Duplicate serial: rightSerial already used");
     };
 
-    let defaultLayout : LayoutSettings = {
-      x = 0;
-      y = 0;
-      scale = 1.0;
-      width = 0;
-      height = 0;
-      fontSize = 12;
-      verticalSpacing = 0;
-    };
-
-    let defaultPosition : BarcodePosition = {
-      x = 0;
-      y = 0;
-      verticalSpacing = 0;
-    };
-
-    let defaultSettings : LabelSettings = {
-      widthMm = 58;
-      heightMm = 43;
-      barcodeType = "CODE128";
-      barcodeHeight = 10;
-      spacing = 5;
-      prefixMappings = [];
-      titleLayout = defaultLayout;
-      barcode1Layout = defaultLayout;
-      serialText1Layout = defaultLayout;
-      barcode2Layout = defaultLayout;
-      serialText2Layout = defaultLayout;
-      barcode1Position = defaultPosition;
-      barcode2Position = defaultPosition;
-      globalVerticalOffset = 0;
-      globalHorizontalOffset = 0;
-    };
-
     let userSettings = switch (labelSettings.get(caller)) {
-      case (null) { defaultSettings };
+      case (null) { defaultLabelSettings };
       case (?settings) { settings };
     };
 
-    let mappings = Map.fromArray<Text, PrefixMapping>(userSettings.prefixMappings);
+    let mappings = Map.fromIter<Text, PrefixMapping>(userSettings.prefixMappings.vals());
     let mapping = mappings.get(prefix);
     switch (mapping) {
       case (null) { Runtime.trap("Unknown prefix") };
@@ -179,39 +187,7 @@ actor {
     };
 
     switch (labelSettings.get(caller)) {
-      case (null) {
-        let defaultLayout : LayoutSettings = {
-          x = 0;
-          y = 0;
-          scale = 1.0;
-          width = 0;
-          height = 0;
-          fontSize = 12;
-          verticalSpacing = 0;
-        };
-        let defaultPosition : BarcodePosition = {
-          x = 0;
-          y = 0;
-          verticalSpacing = 0;
-        };
-        {
-          widthMm = 58;
-          heightMm = 43;
-          barcodeType = "CODE128";
-          barcodeHeight = 10;
-          spacing = 5;
-          prefixMappings = [];
-          titleLayout = defaultLayout;
-          barcode1Layout = defaultLayout;
-          serialText1Layout = defaultLayout;
-          barcode2Layout = defaultLayout;
-          serialText2Layout = defaultLayout;
-          barcode1Position = defaultPosition;
-          barcode2Position = defaultPosition;
-          globalVerticalOffset = 0;
-          globalHorizontalOffset = 0;
-        };
-      };
+      case (null) { defaultLabelSettings };
       case (?settings) { settings };
     };
   };
@@ -228,8 +204,8 @@ actor {
       Runtime.trap("Unauthorized: Only users can view print history");
     };
     let allJobs = printHistory.values().toArray();
-    let isAdmin = AccessControl.isAdmin(accessControlState, caller);
-    if (isAdmin) {
+    let isAdminCaller = AccessControl.isAdmin(accessControlState, caller);
+    if (isAdminCaller) {
       allJobs;
     } else {
       allJobs.filter(func(job : PrintJob) : Bool { job.owner == ?caller });
@@ -241,13 +217,13 @@ actor {
       Runtime.trap("Unauthorized: Only users can view print history");
     };
     let allJobs = printHistory.values().toArray();
-    let isAdmin = AccessControl.isAdmin(accessControlState, caller);
-    let filteredJobs = if (isAdmin) {
+    let isAdminCaller = AccessControl.isAdmin(accessControlState, caller);
+    let filteredJobs = if (isAdminCaller) {
       allJobs;
     } else {
       allJobs.filter(func(job : PrintJob) : Bool { job.owner == ?caller });
     };
-    filteredJobs.sort(PrintJob.compareByLabelType);
+    filteredJobs.sort(comparePrintJobByLabelType);
   };
 
   public query ({ caller }) func getPrintHistoryByTimestamp() : async [PrintJob] {
@@ -255,26 +231,13 @@ actor {
       Runtime.trap("Unauthorized: Only users can view print history");
     };
     let allJobs = printHistory.values().toArray();
-    let isAdmin = AccessControl.isAdmin(accessControlState, caller);
-    let filteredJobs = if (isAdmin) {
+    let isAdminCaller = AccessControl.isAdmin(accessControlState, caller);
+    let filteredJobs = if (isAdminCaller) {
       allJobs;
     } else {
       allJobs.filter(func(job : PrintJob) : Bool { job.owner == ?caller });
     };
-    filteredJobs.sort();
-  };
-
-  module PrintJob {
-    public func compare(a : PrintJob, b : PrintJob) : Order.Order {
-      Int.compare(b.timestamp, a.timestamp);
-    };
-
-    public func compareByLabelType(a : PrintJob, b : PrintJob) : Order.Order {
-      switch (Text.compare(a.labelType, b.labelType)) {
-        case (#equal) { Int.compare(b.timestamp, a.timestamp) };
-        case (order) { order };
-      };
-    };
+    filteredJobs.sort(comparePrintJobByTimestamp);
   };
 
   public shared ({ caller }) func increasePrintCount(jobId : Nat) : async () {
@@ -287,7 +250,7 @@ actor {
         if (job.owner != ?caller and not AccessControl.isAdmin(accessControlState, caller)) {
           Runtime.trap("Unauthorized: Can only modify your own print jobs");
         };
-        let updatedJob = {
+        let updatedJob : PrintJob = {
           id = job.id;
           timestamp = job.timestamp;
           prefix = job.prefix;

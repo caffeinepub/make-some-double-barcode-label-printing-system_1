@@ -1,458 +1,451 @@
-import { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, RotateCcw, Info } from 'lucide-react';
-import { usePrinterService } from '../services/printerService';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useLabelSettingsStore } from '../state/labelSettingsStore';
+import { usePrinterStore } from '../services/printerService';
+import { useSubmitPrintJob } from '../hooks/useQueries';
 import { generateCPCL } from '../printing/cpclGenerator';
-import { playSound } from '../audio/soundSystem';
-import { addLog } from '../state/logStore';
 import { incrementScans, incrementPrints, incrementErrors, incrementTypeScans, incrementTypePrints } from '../state/diagnosticsStore';
 import { addPrintHistory } from '../state/printHistoryStore';
-import { useSubmitPrintJob } from '../hooks/useQueries';
-import SerialTypeCounters from '../components/SerialTypeCounters';
-import { getLabelTypeDisplayName } from '../utils/labelTypes';
+import { addLog } from '../state/logStore';
 import { normalizeSerial } from '../utils/serialNormalization';
-import { formatBackendSubmissionError, formatPrinterError, isNonBlockingBackendError } from '../utils/scanPrintErrors';
+import { formatPrinterError, formatBackendSubmissionError, isNonBlockingBackendError } from '../utils/scanPrintErrors';
+import { playSound } from '../audio/soundSystem';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Printer, ScanLine, AlertCircle, CheckCircle2, RotateCcw } from 'lucide-react';
 
-type FieldValidationState = 'idle' | 'success' | 'error';
+type ScanStep = 'scan1' | 'scan2' | 'confirm' | 'printing' | 'done';
 
-interface ScanPrintTabProps {
-  isActive: boolean;
+interface ScanState {
+  serial1: string;
+  serial2: string;
+  prefix: string;
+  labelType: string;
+  title: string;
 }
 
-export default function ScanPrintTab({ isActive }: ScanPrintTabProps) {
-  const [leftSerial, setLeftSerial] = useState('');
-  const [rightSerial, setRightSerial] = useState('');
-  const [detectedType, setDetectedType] = useState<string | null>(null);
-  const [detectedPrefix, setDetectedPrefix] = useState<string | null>(null);
-  const [leftValidation, setLeftValidation] = useState<FieldValidationState>('idle');
-  const [rightValidation, setRightValidation] = useState<FieldValidationState>('idle');
-  const [errorMessage, setErrorMessage] = useState('');
-  const [backendNotice, setBackendNotice] = useState('');
-  const [step, setStep] = useState<1 | 2>(1);
-  const [isPrinting, setIsPrinting] = useState(false);
-
-  const leftInputRef = useRef<HTMLInputElement>(null);
-  const rightInputRef = useRef<HTMLInputElement>(null);
-  const scanCompleteTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Track last completed value per field to prevent duplicate validation
-  const lastCompletedLeftRef = useRef<string>('');
-  const lastCompletedRightRef = useRef<string>('');
-
-  // Track recently scanned serials for duplicate detection (last 100 scans)
-  const recentScansRef = useRef<Set<string>>(new Set());
-
-  const { isConnected, sendCPCL } = usePrinterService();
-  const { settings } = useLabelSettingsStore();
+export default function ScanPrintTab() {
+  const settings = useLabelSettingsStore((s) => s.settings);
+  const { status: printerStatus, printCPCL } = usePrinterStore();
   const submitPrintJob = useSubmitPrintJob();
 
-  // Autofocus on mount and when tab becomes active
-  useEffect(() => {
-    if (isActive && step === 1) {
-      leftInputRef.current?.focus();
-    }
-  }, [isActive, step]);
+  const [step, setStep] = useState<ScanStep>('scan1');
+  const [scanState, setScanState] = useState<ScanState>({
+    serial1: '',
+    serial2: '',
+    prefix: '',
+    labelType: '',
+    title: '',
+  });
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [duplicateSerialError, setDuplicateSerialError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [inputValue, setInputValue] = useState('');
 
-  // Focus management between steps
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus input on step change
   useEffect(() => {
-    if (step === 1) {
-      leftInputRef.current?.focus();
-    } else if (step === 2) {
-      rightInputRef.current?.focus();
-    }
+    const timer = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+    return () => clearTimeout(timer);
   }, [step]);
 
-  const getPrefixMapping = (serial: string) => {
-    const prefixEntries = Object.entries(settings.prefixMappings);
-    for (const [prefix, mapping] of prefixEntries) {
-      if (serial.startsWith(prefix)) {
-        return { prefix, ...mapping };
+  const resetWorkflow = useCallback(() => {
+    setStep('scan1');
+    setScanState({ serial1: '', serial2: '', prefix: '', labelType: '', title: '' });
+    setErrorMessage(null);
+    setDuplicateSerialError(null);
+    setSuccessMessage(null);
+    setInputValue('');
+  }, []);
+
+  const detectPrefixInfo = useCallback(
+    (serial: string): { prefix: string; labelType: string; title: string } | null => {
+      for (const [prefix, mapping] of Object.entries(settings.prefixMappings)) {
+        if (serial.startsWith(prefix)) {
+          return { prefix, labelType: mapping.labelType, title: mapping.title };
+        }
       }
-    }
-    return null;
-  };
+      return null;
+    },
+    [settings.prefixMappings]
+  );
 
-  const checkDuplicateSerial = (serial: string): boolean => {
-    return recentScansRef.current.has(serial);
-  };
+  const handleScan1 = useCallback(
+    (raw: string) => {
+      const serial = normalizeSerial(raw);
+      if (!serial) return;
 
-  const addToRecentScans = (serial: string) => {
-    recentScansRef.current.add(serial);
-    // Keep only last 100 scans
-    if (recentScansRef.current.size > 100) {
-      const iterator = recentScansRef.current.values();
-      const firstItem = iterator.next().value;
-      if (firstItem !== undefined) {
-        recentScansRef.current.delete(firstItem);
+      setErrorMessage(null);
+      setDuplicateSerialError(null);
+
+      const info = detectPrefixInfo(serial);
+      if (!info) {
+        const msg = `Unknown prefix for serial: ${serial}`;
+        setErrorMessage(msg);
+        playSound('error');
+        addLog('warn', msg);
+        incrementErrors();
+        setInputValue('');
+        return;
       }
-    }
-  };
 
-  const validateAndProcessLeftSerial = (value: string) => {
-    const normalized = normalizeSerial(value);
+      setScanState((prev) => ({
+        ...prev,
+        serial1: serial,
+        prefix: info.prefix,
+        labelType: info.labelType,
+        title: info.title,
+      }));
+      incrementScans();
+      incrementTypeScans(info.prefix, info.labelType);
+      playSound('success');
+      setInputValue('');
+      setStep('scan2');
+    },
+    [detectPrefixInfo]
+  );
 
-    if (normalized === lastCompletedLeftRef.current) return;
-    if (normalized.length < 3) return;
+  const handleScan2 = useCallback(
+    (raw: string) => {
+      const serial = normalizeSerial(raw);
+      if (!serial) return;
 
-    lastCompletedLeftRef.current = normalized;
+      setErrorMessage(null);
+      setDuplicateSerialError(null);
 
-    if (normalized !== value) {
-      setLeftSerial(normalized);
-    }
+      // Duplicate serial check: 2nd must differ from 1st
+      if (serial === scanState.serial1) {
+        const msg = 'Serial numbers must be unique — please scan a different serial number.';
+        setDuplicateSerialError(msg);
+        playSound('error');
+        addLog('warn', `Duplicate serial detected: ${serial}`);
+        setInputValue('');
+        return;
+      }
 
-    const mapping = getPrefixMapping(normalized);
-    if (!mapping) {
-      setLeftValidation('error');
-      setErrorMessage('Unknown prefix - scan again');
-      playSound('error');
-      addLog('error', `Unknown prefix in serial: ${normalized}`);
-      incrementErrors();
+      const info = detectPrefixInfo(serial);
+      if (!info) {
+        const msg = `Unknown prefix for serial: ${serial}`;
+        setErrorMessage(msg);
+        playSound('error');
+        addLog('warn', msg);
+        incrementErrors();
+        setInputValue('');
+        return;
+      }
 
-      setTimeout(() => {
-        setLeftSerial('');
-        setLeftValidation('idle');
-        setErrorMessage('');
-        lastCompletedLeftRef.current = '';
-        leftInputRef.current?.focus();
-      }, 1500);
+      if (info.prefix !== scanState.prefix) {
+        const msg = `Serial prefix mismatch: expected "${scanState.prefix}", got "${info.prefix}"`;
+        setErrorMessage(msg);
+        playSound('error');
+        addLog('warn', msg);
+        setInputValue('');
+        return;
+      }
+
+      setScanState((prev) => ({ ...prev, serial2: serial }));
+      incrementScans();
+      incrementTypeScans(info.prefix, info.labelType);
+      playSound('success');
+      setInputValue('');
+      setStep('confirm');
+    },
+    [scanState.serial1, scanState.prefix, detectPrefixInfo]
+  );
+
+  const handlePrint = useCallback(async () => {
+    if (printerStatus !== 'connected') {
+      setErrorMessage('Printer is not connected. Please connect a printer in the Devices tab.');
       return;
     }
 
-    if (checkDuplicateSerial(normalized)) {
-      setLeftValidation('error');
-      setErrorMessage('Duplicate serial detected - scan again');
-      playSound('error');
-      addLog('error', `Duplicate serial detected: ${normalized}`);
-      incrementErrors();
-
-      setTimeout(() => {
-        setLeftSerial('');
-        setLeftValidation('idle');
-        setErrorMessage('');
-        lastCompletedLeftRef.current = '';
-        leftInputRef.current?.focus();
-      }, 1500);
-      return;
-    }
-
-    setDetectedType(mapping.labelType);
-    setDetectedPrefix(mapping.prefix);
-    setLeftValidation('success');
-    playSound('success');
-    addLog('info', `Detected label type: ${mapping.labelType} (${mapping.title})`);
-    incrementScans();
-    incrementTypeScans(mapping.prefix, mapping.labelType);
-
-    setTimeout(() => {
-      setStep(2);
-    }, 100);
-  };
-
-  const validateAndProcessRightSerial = async (value: string) => {
-    if (isPrinting) return;
-
-    const normalized = normalizeSerial(value);
-
-    if (normalized === lastCompletedRightRef.current) return;
-    if (normalized.length < 3 || !detectedPrefix || !detectedType) return;
-
-    lastCompletedRightRef.current = normalized;
-
-    if (normalized !== value) {
-      setRightSerial(normalized);
-    }
-
-    const mapping = getPrefixMapping(normalized);
-
-    if (!mapping) {
-      setRightValidation('error');
-      setErrorMessage('Unknown prefix - scan again');
-      playSound('error');
-      addLog('error', `Unknown prefix in serial: ${normalized}`);
-      incrementErrors();
-
-      setTimeout(() => {
-        setRightSerial('');
-        setRightValidation('idle');
-        setErrorMessage('');
-        lastCompletedRightRef.current = '';
-        rightInputRef.current?.focus();
-      }, 1500);
-      return;
-    }
-
-    if (checkDuplicateSerial(normalized)) {
-      setRightValidation('error');
-      setErrorMessage('Duplicate serial detected - scan again');
-      playSound('error');
-      addLog('error', `Duplicate serial detected: ${normalized}`);
-      incrementErrors();
-
-      setTimeout(() => {
-        setRightSerial('');
-        setRightValidation('idle');
-        setErrorMessage('');
-        lastCompletedRightRef.current = '';
-        rightInputRef.current?.focus();
-      }, 1500);
-      return;
-    }
-
-    if (mapping.labelType !== detectedType) {
-      setRightValidation('error');
-      setErrorMessage(`Label type mismatch: expected ${getLabelTypeDisplayName(detectedType)}, got ${getLabelTypeDisplayName(mapping.labelType)}`);
-      playSound('error');
-      addLog('error', `Label type mismatch: expected ${detectedType}, got ${mapping.labelType}`);
-      incrementErrors();
-      return;
-    }
-
-    if (!isConnected) {
-      setRightValidation('error');
-      setErrorMessage('Printer not connected');
-      playSound('error');
-      addLog('error', 'Print failed: printer not connected');
-      incrementErrors();
-      return;
-    }
-
-    setRightValidation('success');
-    playSound('success');
-    incrementScans();
-    incrementTypeScans(detectedPrefix, detectedType);
-
-    setIsPrinting(true);
-    setErrorMessage('');
-    setBackendNotice('');
-
-    const normalizedLeft = normalizeSerial(leftSerial);
+    setStep('printing');
+    setErrorMessage(null);
 
     try {
-      // Generate CPCL from local settings
-      const cpcl = generateCPCL(settings, normalizedLeft, normalized, detectedPrefix);
+      const cpcl = generateCPCL(settings, scanState.serial1, scanState.serial2, scanState.prefix);
 
-      // Send CPCL to printer (critical path)
-      await sendCPCL(cpcl);
+      await printCPCL(cpcl);
 
-      // Add serials to recent scans for duplicate detection
-      addToRecentScans(normalizedLeft);
-      addToRecentScans(normalized);
-
-      // Update local diagnostics and history
       addPrintHistory({
         timestamp: Date.now(),
-        prefix: detectedPrefix,
-        leftSerial: normalizedLeft,
-        rightSerial: normalized,
-        labelType: detectedType,
+        prefix: scanState.prefix,
+        leftSerial: scanState.serial1,
+        rightSerial: scanState.serial2,
+        labelType: scanState.labelType,
         cpcl,
         success: true,
       });
 
       incrementPrints();
-      incrementTypePrints(detectedPrefix, detectedType);
+      incrementTypePrints(scanState.prefix, scanState.labelType);
       playSound('printComplete');
-      addLog('info', `Print completed: ${normalizedLeft} / ${normalized}`);
+      addLog('info', `Printed label: ${scanState.serial1} / ${scanState.serial2}`);
 
-      resetForm();
+      setSuccessMessage(`Label printed: ${scanState.serial1} / ${scanState.serial2}`);
+      setStep('done');
 
-      // Best-effort backend submission (fire-and-forget, non-blocking)
-      submitPrintJob.mutateAsync({
-        prefix: detectedPrefix,
-        leftSerial: normalizedLeft,
-        rightSerial: normalized,
-      }).then(() => {
-        addLog('info', 'Backend submission successful');
-      }).catch((error: any) => {
-        const msg = formatBackendSubmissionError(error);
-        if (!isNonBlockingBackendError(error)) {
-          setBackendNotice(msg);
-        }
-        addLog('warn', `Backend submission failed (non-blocking): ${msg}`);
-      });
-
-    } catch (error: any) {
-      const msg = formatPrinterError(error);
-      setRightValidation('error');
+      // Best-effort backend submission (non-blocking)
+      submitPrintJob
+        .mutateAsync({
+          prefix: scanState.prefix,
+          leftSerial: scanState.serial1,
+          rightSerial: scanState.serial2,
+        })
+        .then(() => {
+          addLog('info', 'Backend submission successful');
+        })
+        .catch((error: unknown) => {
+          const msg = formatBackendSubmissionError(error);
+          if (!isNonBlockingBackendError(error)) {
+            addLog('warn', `Backend submission failed: ${msg}`);
+          }
+        });
+    } catch (err: unknown) {
+      const msg = formatPrinterError(err);
       setErrorMessage(msg);
       playSound('error');
-      addLog('error', `Print failed: ${msg}`);
+      addLog('error', `Print failed: ${msg}`, { serial1: scanState.serial1, serial2: scanState.serial2 });
       incrementErrors();
 
       addPrintHistory({
         timestamp: Date.now(),
-        prefix: detectedPrefix,
-        leftSerial: normalizedLeft,
-        rightSerial: normalized,
-        labelType: detectedType,
+        prefix: scanState.prefix,
+        leftSerial: scanState.serial1,
+        rightSerial: scanState.serial2,
+        labelType: scanState.labelType,
         cpcl: '',
         success: false,
       });
-    } finally {
-      setIsPrinting(false);
+
+      setStep('confirm');
+    }
+  }, [printerStatus, scanState, settings, printCPCL, submitPrintJob]);
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const val = inputValue.trim();
+      if (!val) return;
+      if (step === 'scan1') handleScan1(val);
+      else if (step === 'scan2') handleScan2(val);
     }
   };
 
-  const resetForm = () => {
-    setLeftSerial('');
-    setRightSerial('');
-    setDetectedType(null);
-    setDetectedPrefix(null);
-    setLeftValidation('idle');
-    setRightValidation('idle');
-    setErrorMessage('');
-    setBackendNotice('');
-    setStep(1);
-    lastCompletedLeftRef.current = '';
-    lastCompletedRightRef.current = '';
-    if (scanCompleteTimerRef.current) {
-      clearTimeout(scanCompleteTimerRef.current);
-    }
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+    if (duplicateSerialError) setDuplicateSerialError(null);
+    if (errorMessage) setErrorMessage(null);
   };
 
-  const getValidationBorderClass = (state: FieldValidationState) => {
-    if (state === 'success') return 'border-green-500 focus:border-green-500';
-    if (state === 'error') return 'border-red-500 focus:border-red-500';
-    return '';
-  };
-
+  const isPrinterConnected = printerStatus === 'connected';
   const prefixCount = Object.keys(settings.prefixMappings).length;
 
   return (
-    <div className="space-y-6">
-      {/* Counters */}
-      <SerialTypeCounters />
+    <div className="flex flex-col gap-4 p-4 max-w-lg mx-auto">
+      {/* Printer status */}
+      <div className="flex items-center gap-2">
+        <Printer className="w-4 h-4 text-muted-foreground" />
+        <span className="text-sm text-muted-foreground">Printer:</span>
+        <Badge variant={isPrinterConnected ? 'default' : 'destructive'}>
+          {isPrinterConnected ? 'Connected' : 'Disconnected'}
+        </Badge>
+      </div>
 
-      {/* Scan workflow */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Scan &amp; Print</CardTitle>
-              <CardDescription>
-                {prefixCount === 0
-                  ? 'Configure prefix mappings in Label Settings first'
-                  : `Step ${step} of 2 — scan ${step === 1 ? 'left' : 'right'} serial`}
-              </CardDescription>
-            </div>
-            {(step === 2 || errorMessage) && (
-              <Button variant="outline" size="sm" onClick={resetForm} className="gap-2">
-                <RotateCcw className="w-4 h-4" />
-                Reset
-              </Button>
-            )}
+      {/* No prefix mappings warning */}
+      {prefixCount === 0 && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            No prefix mappings configured. Go to Label Settings → Prefixes to add mappings.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Step indicator */}
+      <div className="flex items-center gap-2 text-sm">
+        <StepBadge
+          active={step === 'scan1'}
+          done={['scan2', 'confirm', 'printing', 'done'].includes(step)}
+          label="1. Scan Serial 1"
+        />
+        <div className="flex-1 h-px bg-border" />
+        <StepBadge
+          active={step === 'scan2'}
+          done={['confirm', 'printing', 'done'].includes(step)}
+          label="2. Scan Serial 2"
+        />
+        <div className="flex-1 h-px bg-border" />
+        <StepBadge
+          active={step === 'confirm' || step === 'printing'}
+          done={step === 'done'}
+          label="3. Print"
+        />
+      </div>
+
+      {/* Generic error message */}
+      {errorMessage && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{errorMessage}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Success message */}
+      {successMessage && step === 'done' && (
+        <Alert className="border-green-500 bg-green-500/10">
+          <CheckCircle2 className="h-4 w-4 text-green-500" />
+          <AlertDescription className="text-green-400">{successMessage}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Scan step 1 */}
+      {step === 'scan1' && (
+        <div className="flex flex-col gap-3">
+          <label className="text-sm font-medium flex items-center gap-2">
+            <ScanLine className="w-4 h-4" />
+            Scan First Serial Number
+          </label>
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputValue}
+            onChange={handleInputChange}
+            onKeyDown={handleInputKeyDown}
+            placeholder="Scan or type serial number..."
+            className="w-full px-3 py-3 rounded-md border border-input bg-background text-foreground text-base focus:outline-none focus:ring-2 focus:ring-ring"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+          <p className="text-xs text-muted-foreground">Press Enter or scan barcode to confirm.</p>
+        </div>
+      )}
+
+      {/* Scan step 2 */}
+      {step === 'scan2' && (
+        <div className="flex flex-col gap-3">
+          <div className="rounded-md bg-muted px-3 py-2 text-sm">
+            <span className="text-muted-foreground">Serial 1: </span>
+            <span className="font-mono font-medium">{scanState.serial1}</span>
+            <span className="ml-2 text-xs text-muted-foreground">
+              ({scanState.title || scanState.labelType})
+            </span>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {prefixCount === 0 && (
-            <Alert>
-              <Info className="w-4 h-4" />
-              <AlertDescription>
-                No prefix mappings configured. Go to Label Settings → Prefixes to add mappings.
-              </AlertDescription>
-            </Alert>
-          )}
 
-          {errorMessage && (
+          <label className="text-sm font-medium flex items-center gap-2">
+            <ScanLine className="w-4 h-4" />
+            Scan Second Serial Number
+          </label>
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputValue}
+            onChange={handleInputChange}
+            onKeyDown={handleInputKeyDown}
+            placeholder="Scan or type serial number..."
+            className="w-full px-3 py-3 rounded-md border border-input bg-background text-foreground text-base focus:outline-none focus:ring-2 focus:ring-ring"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+
+          {/* Duplicate serial error shown inline near 2nd serial input */}
+          {duplicateSerialError && (
             <Alert variant="destructive">
-              <AlertCircle className="w-4 h-4" />
-              <AlertDescription>{errorMessage}</AlertDescription>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{duplicateSerialError}</AlertDescription>
             </Alert>
           )}
 
-          {backendNotice && !errorMessage && (
-            <Alert>
-              <Info className="w-4 h-4" />
-              <AlertDescription className="text-yellow-600">{backendNotice}</AlertDescription>
-            </Alert>
-          )}
+          <p className="text-xs text-muted-foreground">
+            Press Enter or scan barcode to confirm. Must be different from Serial 1.
+          </p>
 
-          {/* Step 1: Left serial */}
-          <div className="space-y-2">
-            <Label htmlFor="left-serial" className="flex items-center gap-2">
-              Left Serial
-              {step === 1 && <Badge variant="default" className="text-xs">Active</Badge>}
-              {leftValidation === 'success' && <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-400">✓</Badge>}
-            </Label>
-            <Input
-              id="left-serial"
-              ref={leftInputRef}
-              value={leftSerial}
-              onChange={(e) => setLeftSerial(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && leftSerial.trim()) {
-                  validateAndProcessLeftSerial(leftSerial);
-                }
-              }}
-              onBlur={() => {
-                if (leftSerial.trim() && step === 1) {
-                  validateAndProcessLeftSerial(leftSerial);
-                }
-              }}
-              placeholder="Scan or type left serial..."
-              disabled={step !== 1 || isPrinting}
-              className={`font-mono text-lg h-12 ${getValidationBorderClass(leftValidation)}`}
-              autoComplete="off"
-            />
-            {detectedType && (
-              <p className="text-xs text-muted-foreground">
-                Detected: <span className="font-medium text-green-400">{getLabelTypeDisplayName(detectedType)}</span>
-              </p>
-            )}
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setStep('scan1');
+              setInputValue('');
+              setErrorMessage(null);
+              setDuplicateSerialError(null);
+            }}
+          >
+            ← Re-scan Serial 1
+          </Button>
+        </div>
+      )}
 
-          {/* Step 2: Right serial */}
-          <div className="space-y-2">
-            <Label htmlFor="right-serial" className="flex items-center gap-2">
-              Right Serial
-              {step === 2 && <Badge variant="default" className="text-xs">Active</Badge>}
-              {rightValidation === 'success' && <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-400">✓</Badge>}
-            </Label>
-            <Input
-              id="right-serial"
-              ref={rightInputRef}
-              value={rightSerial}
-              onChange={(e) => setRightSerial(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && rightSerial.trim()) {
-                  validateAndProcessRightSerial(rightSerial);
-                }
-              }}
-              onBlur={() => {
-                if (rightSerial.trim() && step === 2) {
-                  validateAndProcessRightSerial(rightSerial);
-                }
-              }}
-              placeholder="Scan or type right serial..."
-              disabled={step !== 2 || isPrinting}
-              className={`font-mono text-lg h-12 ${getValidationBorderClass(rightValidation)}`}
-              autoComplete="off"
-            />
-          </div>
-
-          {isPrinting && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span className="animate-spin">⏳</span>
-              Printing...
+      {/* Confirm step */}
+      {(step === 'confirm' || step === 'printing') && (
+        <div className="flex flex-col gap-3">
+          <div className="rounded-md border border-border bg-muted/50 p-3 flex flex-col gap-2">
+            <div className="text-sm font-medium">{scanState.title || scanState.labelType}</div>
+            <div className="flex flex-col gap-1 text-sm">
+              <div>
+                <span className="text-muted-foreground">Serial 1: </span>
+                <span className="font-mono">{scanState.serial1}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Serial 2: </span>
+                <span className="font-mono">{scanState.serial2}</span>
+              </div>
             </div>
-          )}
+          </div>
 
-          {!isConnected && (
-            <Alert>
-              <AlertCircle className="w-4 h-4" />
-              <AlertDescription>
-                No printer connected. Connect a printer in the Devices tab.
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
+          <div className="flex gap-2">
+            <Button
+              onClick={handlePrint}
+              disabled={step === 'printing' || !isPrinterConnected}
+              className="flex-1"
+            >
+              {step === 'printing' ? (
+                <>
+                  <span className="animate-spin mr-2">⏳</span>
+                  Printing...
+                </>
+              ) : (
+                <>
+                  <Printer className="w-4 h-4 mr-2" />
+                  Print Label
+                </>
+              )}
+            </Button>
+            <Button variant="outline" onClick={resetWorkflow} disabled={step === 'printing'}>
+              <RotateCcw className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Done step */}
+      {step === 'done' && (
+        <div className="flex flex-col gap-3">
+          <Button onClick={resetWorkflow} className="w-full">
+            <ScanLine className="w-4 h-4 mr-2" />
+            Scan Next Label
+          </Button>
+        </div>
+      )}
     </div>
+  );
+}
+
+function StepBadge({ active, done, label }: { active: boolean; done: boolean; label: string }) {
+  return (
+    <span
+      className={`text-xs px-2 py-1 rounded-full whitespace-nowrap transition-colors ${
+        done
+          ? 'bg-green-500/20 text-green-400'
+          : active
+          ? 'bg-primary/20 text-primary font-semibold'
+          : 'bg-muted text-muted-foreground'
+      }`}
+    >
+      {label}
+    </span>
   );
 }

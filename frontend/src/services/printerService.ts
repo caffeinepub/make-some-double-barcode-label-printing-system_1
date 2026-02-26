@@ -1,157 +1,148 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { addLog } from '../state/logStore';
 import {
-  isWebUSBSupported,
-  requestUSBPrinter,
-  sendCPCLToUSB,
-  disconnectUSBPrinter,
-  type USBPrinterDevice,
+  requestDevice,
+  reconnectToDevice,
+  disconnectDevice,
+  sendData,
+  saveLastPrinterIdentifier,
+  loadLastPrinterIdentifier,
+  type UsbDevice,
 } from './usbCpclTransport';
 import { getCurrentSettings } from '../state/labelSettingsStore';
-import { generateCPCL, generateTestPrintCPCL } from '../printing/cpclGenerator';
-import { addLog } from '../state/logStore';
+import { generateTestPrintCPCL, generateCPCL } from '../printing/cpclGenerator';
 
-type ConnectionMethod = 'usb';
+export type PrinterStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 interface PrinterState {
-  isConnected: boolean;
-  isConnecting: boolean;
-  connectionMethod: ConnectionMethod | null;
-  usbDevice: USBPrinterDevice | null;
-  connect: (method: ConnectionMethod) => Promise<void>;
-  disconnect: () => void;
-  refresh: () => Promise<void>;
-  sendCPCL: (cpcl: string) => Promise<void>;
+  status: PrinterStatus;
+  errorMessage: string | null;
+  usbDevice: UsbDevice | null;
+  deviceName: string | null;
+  isAutoReconnecting: boolean;
+
+  connectPrinter: () => Promise<void>;
+  disconnectPrinter: () => Promise<void>;
+  autoReconnectPrinter: () => Promise<void>;
+  printCPCL: (cpcl: string) => Promise<void>;
   testPrint: () => Promise<void>;
 }
 
-export const usePrinterService = create<PrinterState>()(
-  persist(
-    (set, get) => ({
-      isConnected: false,
-      isConnecting: false,
-      connectionMethod: null,
-      usbDevice: null,
+export const usePrinterStore = create<PrinterState>((set, get) => ({
+  status: 'disconnected',
+  errorMessage: null,
+  usbDevice: null,
+  deviceName: null,
+  isAutoReconnecting: false,
 
-      connect: async (method: ConnectionMethod) => {
-        set({ isConnecting: true });
+  connectPrinter: async () => {
+    set({ status: 'connecting', errorMessage: null });
+    try {
+      const usbDevice = await requestDevice();
+      if (!usbDevice) {
+        set({ status: 'disconnected', errorMessage: null });
+        return;
+      }
 
-        try {
-          if (method === 'usb') {
-            if (!isWebUSBSupported()) {
-              throw new Error('WebUSB is not supported in this browser. Please use Chrome, Edge, or Opera.');
-            }
+      const deviceName =
+        usbDevice.device.productName ||
+        `USB Device (${usbDevice.vendorId.toString(16)}:${usbDevice.productId.toString(16)})`;
 
-            const device = await requestUSBPrinter();
-            if (!device) {
-              set({ isConnecting: false });
-              return;
-            }
+      // Save printer identifier for auto-reconnect
+      saveLastPrinterIdentifier({
+        vendorId: usbDevice.vendorId,
+        productId: usbDevice.productId,
+        serialNumber: usbDevice.serialNumber,
+      });
 
-            set({
-              isConnected: true,
-              isConnecting: false,
-              connectionMethod: 'usb',
-              usbDevice: device,
-            });
-
-            addLog('info', 'USB printer connected successfully', {
-              category: 'printer',
-              method: 'usb',
-            });
-          } else {
-            throw new Error('Unsupported connection method. Only USB is supported.');
-          }
-        } catch (error: any) {
-          set({ isConnecting: false });
-          addLog('error', `Printer connection failed: ${error.message}`, {
-            category: 'printer',
-            method,
-          });
-          throw error;
-        }
-      },
-
-      disconnect: async () => {
-        const { usbDevice, connectionMethod } = get();
-
-        if (connectionMethod === 'usb' && usbDevice) {
-          await disconnectUSBPrinter(usbDevice);
-          addLog('info', 'USB printer disconnected', {
-            category: 'printer',
-          });
-        }
-
-        set({
-          isConnected: false,
-          connectionMethod: null,
-          usbDevice: null,
-        });
-      },
-
-      refresh: async () => {
-        set({ isConnecting: true });
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        set({ isConnecting: false });
-      },
-
-      sendCPCL: async (cpcl: string) => {
-        const { isConnected, connectionMethod, usbDevice } = get();
-
-        if (!isConnected) {
-          throw new Error('Printer not connected');
-        }
-
-        if (connectionMethod === 'usb' && usbDevice) {
-          await sendCPCLToUSB(usbDevice, cpcl);
-          addLog('info', 'CPCL sent to USB printer successfully', {
-            category: 'printer',
-            cpclLength: cpcl.length,
-          });
-        } else {
-          throw new Error('No valid printer connection');
-        }
-      },
-
-      testPrint: async () => {
-        const { isConnected, sendCPCL } = get();
-
-        if (!isConnected) {
-          throw new Error('Printer not connected');
-        }
-
-        addLog('info', 'Starting test print', {
-          category: 'printer',
-        });
-
-        const settings = getCurrentSettings();
-        const prefixKeys = Object.keys(settings.prefixMappings);
-
-        if (!settings || prefixKeys.length === 0) {
-          const testCPCL = generateTestPrintCPCL();
-          await sendCPCL(testCPCL);
-        } else {
-          const firstPrefix = prefixKeys[0];
-          const testCPCL = generateCPCL(
-            settings,
-            'TEST-SERIAL-001',
-            'TEST-SERIAL-002',
-            firstPrefix
-          );
-          await sendCPCL(testCPCL);
-        }
-
-        addLog('info', 'Test print completed successfully', {
-          category: 'printer',
-        });
-      },
-    }),
-    {
-      name: 'printer-service',
-      partialize: (state) => ({
-        isConnected: false,
-        connectionMethod: state.connectionMethod,
-      }),
+      set({ status: 'connected', usbDevice, deviceName, errorMessage: null });
+      addLog('info', `Printer connected: ${deviceName}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      set({ status: 'error', errorMessage: msg });
+      addLog('error', `Printer connection failed: ${msg}`);
     }
-  )
-);
+  },
+
+  disconnectPrinter: async () => {
+    const { usbDevice } = get();
+    if (usbDevice) {
+      await disconnectDevice(usbDevice);
+    }
+    set({ status: 'disconnected', usbDevice: null, deviceName: null, errorMessage: null });
+    addLog('info', 'Printer disconnected');
+  },
+
+  autoReconnectPrinter: async () => {
+    const { status } = get();
+    if (status === 'connected' || status === 'connecting') return;
+
+    const savedId = loadLastPrinterIdentifier();
+    if (!savedId) return;
+
+    set({ isAutoReconnecting: true });
+    addLog('info', 'Attempting auto-reconnect to last printer...');
+
+    try {
+      const usbDevice = await reconnectToDevice(savedId);
+      if (!usbDevice) {
+        addLog('info', 'Auto-reconnect: printer not found or not authorized yet.');
+        set({ isAutoReconnecting: false });
+        return;
+      }
+
+      const deviceName =
+        usbDevice.device.productName ||
+        `USB Device (${usbDevice.vendorId.toString(16)}:${usbDevice.productId.toString(16)})`;
+
+      set({ status: 'connected', usbDevice, deviceName, errorMessage: null, isAutoReconnecting: false });
+      addLog('info', `Auto-reconnected to printer: ${deviceName}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addLog('warn', `Auto-reconnect failed: ${msg}`);
+      set({ isAutoReconnecting: false });
+    }
+  },
+
+  printCPCL: async (cpcl: string) => {
+    const { usbDevice } = get();
+    if (!usbDevice) {
+      throw new Error('No printer connected');
+    }
+
+    const encoder = new TextEncoder();
+    const data = encoder.encode(cpcl);
+
+    try {
+      await sendData(usbDevice, data);
+      addLog('info', 'Print job sent successfully');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addLog('error', `Print failed: ${msg}`);
+      set({ status: 'error', errorMessage: msg });
+      throw err;
+    }
+  },
+
+  testPrint: async () => {
+    const { printCPCL } = get();
+    const settings = getCurrentSettings();
+
+    const prefixes = Object.keys(settings.prefixMappings);
+    if (prefixes.length > 0) {
+      const firstPrefix = prefixes[0];
+      const testSerial1 = `${firstPrefix}000001`;
+      const testSerial2 = `${firstPrefix}000002`;
+      const cpcl = generateCPCL(settings, testSerial1, testSerial2, firstPrefix);
+      await printCPCL(cpcl);
+    } else {
+      const cpcl = generateTestPrintCPCL();
+      await printCPCL(cpcl);
+    }
+
+    addLog('info', 'Test print sent');
+  },
+}));
+
+// Legacy alias so existing code that imports usePrinterService still compiles
+export const usePrinterService = usePrinterStore;

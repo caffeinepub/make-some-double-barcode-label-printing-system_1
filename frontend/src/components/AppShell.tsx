@@ -20,9 +20,9 @@ export default function AppShell() {
         <div className="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-shrink">
             <div className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 flex items-center justify-center bg-muted/30 rounded-md p-1">
-              <img 
-                src="/assets/generated/app-logo.dim_256x256.png" 
-                alt="Make Some Double logo" 
+              <img
+                src="/assets/generated/app-logo.dim_256x256.png"
+                alt="Make Some Double logo"
                 className="w-full h-full object-contain"
               />
             </div>
@@ -31,12 +31,7 @@ export default function AppShell() {
           <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
             <BackendAvailabilityIndicator />
             <HeaderDeviceControls />
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={lock}
-              className="gap-2"
-            >
+            <Button variant="outline" size="lg" onClick={lock} className="gap-2">
               <Lock className="w-5 h-5" />
               <span className="hidden sm:inline">Lock</span>
             </Button>
@@ -49,7 +44,7 @@ export default function AppShell() {
           <TabsList className="grid w-full grid-cols-4 h-16 mb-6">
             <TabsTrigger value="scan" className="text-base gap-2">
               <Scan className="w-5 h-5" />
-              Scan & Print
+              Scan &amp; Print
             </TabsTrigger>
             <TabsTrigger value="settings" className="text-base gap-2">
               <Settings className="w-5 h-5" />
@@ -66,7 +61,8 @@ export default function AppShell() {
           </TabsList>
 
           <TabsContent value="scan" className="mt-0">
-            <ScanPrintTab key={activeTab === 'scan' ? 'active' : 'inactive'} isActive={activeTab === 'scan'} />
+            {/* ScanPrintTab no longer needs isActive prop; key forces remount on tab switch */}
+            <ScanPrintTab key={activeTab === 'scan' ? 'active' : 'inactive'} />
           </TabsContent>
           <TabsContent value="settings" className="mt-0">
             <LabelSettingsTab />
@@ -82,9 +78,9 @@ export default function AppShell() {
 
       <footer className="border-t border-border bg-card py-4">
         <div className="container mx-auto px-6 text-center text-sm text-muted-foreground">
-          © 2026. Built with ❤️ using{' '}
+          © {new Date().getFullYear()}. Built with ❤️ using{' '}
           <a
-            href="https://caffeine.ai"
+            href={`https://caffeine.ai/?utm_source=Caffeine-footer&utm_medium=referral&utm_content=${encodeURIComponent(window.location.hostname || 'unknown-app')}`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-primary hover:underline"

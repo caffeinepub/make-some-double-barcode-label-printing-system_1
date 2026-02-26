@@ -1,10 +1,10 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { usePrinterService } from '../services/printerService';
+import { usePrinterStore } from '../services/printerService';
 import { addLog } from './logStore';
 import { incrementPrints } from './diagnosticsStore';
 
-interface PrintHistoryEntry {
+export interface PrintHistoryEntry {
   timestamp: number;
   prefix: string;
   leftSerial: string;
@@ -23,9 +23,10 @@ const usePrintHistoryStore = create<PrintHistoryState>()(
   persist(
     (set) => ({
       history: [],
-      addEntry: (entry) => set((state) => ({ 
-        history: [entry, ...state.history].slice(0, 1000) // Keep last 1000 entries
-      })),
+      addEntry: (entry) =>
+        set((state) => ({
+          history: [entry, ...state.history].slice(0, 1000),
+        })),
     }),
     {
       name: 'print-history',
@@ -35,18 +36,19 @@ const usePrintHistoryStore = create<PrintHistoryState>()(
 
 export function usePrintHistory() {
   const { history } = usePrintHistoryStore();
-  const { sendCPCL } = usePrinterService();
+  const printCPCL = usePrinterStore((s) => s.printCPCL);
 
   const reprint = async (index: number) => {
     const entry = history[index];
     if (!entry) return;
 
     try {
-      await sendCPCL(entry.cpcl);
+      await printCPCL(entry.cpcl);
       addLog('info', `Reprinted label: ${entry.leftSerial} / ${entry.rightSerial}`);
       incrementPrints();
-    } catch (error: any) {
-      addLog('error', `Reprint failed: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      addLog('error', `Reprint failed: ${msg}`);
     }
   };
 

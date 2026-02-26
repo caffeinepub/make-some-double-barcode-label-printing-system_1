@@ -1,14 +1,12 @@
 # Specification
 
 ## Summary
-**Goal:** Add a barcode width input field to the Label Settings tab so users can control barcode width when printing labels.
+**Goal:** Investigate and fix the recurring production deployment failure by resolving backend Motoko compilation errors and frontend build issues.
 
 **Planned changes:**
-- Add a barcode width input control to the Label Settings tab UI, consistent with existing dot-based units
-- Wire the input to read from and write to `labelSettingsStore`, with persistence via localStorage
-- Validate the barcode width value through the existing `barcodeSettingsValidation` utility and display errors on invalid input
-- Update the `LabelPreview` component to reflect barcode width changes in real time
-- Include barcode width in label settings JSON import/export serialization
-- Update the CPCL generator to use the stored barcode width value when generating print commands
+- Audit `backend/main.mo` for syntax errors, type mismatches, and invalid stable variable declarations that prevent the canister from building or upgrading
+- Fix any identified Motoko compilation errors so the actor compiles cleanly
+- Audit frontend build configuration (vite config, tsconfig, tailwind config, index.html, package.json) for missing environment variables, broken imports, type errors, or invalid asset references
+- Fix any identified frontend build issues so the production build completes successfully
 
-**User-visible outcome:** Users can set a custom barcode width in the Label Settings tab, see it reflected immediately in the label preview, and have it applied when generating CPCL print commands.
+**User-visible outcome:** Production deployment completes without errors and the deployed app loads correctly.

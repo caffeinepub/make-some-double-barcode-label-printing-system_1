@@ -4,30 +4,31 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Printer, RefreshCw, Keyboard, CheckCircle2, Usb, TestTube2, AlertTriangle } from 'lucide-react';
-import { usePrinterService } from '../services/printerService';
+import { usePrinterStore } from '../services/printerService';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 
 export default function DevicesTab() {
-  const { isConnected, connect, disconnect, refresh, isConnecting, connectionMethod, testPrint } = usePrinterService();
+  const { status, connectPrinter, disconnectPrinter, testPrint, deviceName, isAutoReconnecting } = usePrinterStore();
   const [isTestPrinting, setIsTestPrinting] = useState(false);
+
+  const isConnected = status === 'connected';
+  const isConnecting = status === 'connecting' || isAutoReconnecting;
 
   const handleConnect = async () => {
     try {
-      await connect('usb');
-      // Check the actual connection state from the store after connect completes
-      const state = usePrinterService.getState();
-      if (state.isConnected) {
+      await connectPrinter();
+      if (usePrinterStore.getState().status === 'connected') {
         toast.success('Connected via USB');
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to connect to printer');
-      console.error('Connection error:', error);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Failed to connect to printer';
+      toast.error(msg);
     }
   };
 
-  const handleDisconnect = () => {
-    disconnect();
+  const handleDisconnect = async () => {
+    await disconnectPrinter();
     toast.success('Printer disconnected');
   };
 
@@ -36,15 +37,14 @@ export default function DevicesTab() {
     try {
       await testPrint();
       toast.success('Test print sent successfully');
-    } catch (error: any) {
-      toast.error(error.message || 'Test print failed');
-      console.error('Test print error:', error);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Test print failed';
+      toast.error(msg);
     } finally {
       setIsTestPrinting(false);
     }
   };
 
-  // Check if WebUSB is supported
   const isWebUSBSupported = 'usb' in navigator;
 
   return (
@@ -63,7 +63,8 @@ export default function DevicesTab() {
             <Alert>
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                <strong>Note:</strong> Bluetooth printing is not supported. Please use a USB connection with a CPCL-compatible printer.
+                <strong>Note:</strong> Bluetooth printing is not supported. Please use a USB connection with a
+                CPCL-compatible printer.
               </AlertDescription>
             </Alert>
           )}
@@ -83,11 +84,15 @@ export default function DevicesTab() {
             <div className="space-y-1">
               <p className="font-medium">Connection Status</p>
               <p className="text-sm text-muted-foreground">
-                {isConnected ? 'Connected via USB' : 'No printer connected'}
+                {isConnected
+                  ? `Connected via USB${deviceName ? ` — ${deviceName}` : ''}`
+                  : isAutoReconnecting
+                  ? 'Reconnecting to last printer...'
+                  : 'No printer connected'}
               </p>
             </div>
             <Badge variant={isConnected ? 'default' : 'destructive'} className="text-base px-4 py-2">
-              {isConnected ? 'Connected' : 'Disconnected'}
+              {isConnected ? 'Connected' : isAutoReconnecting ? 'Reconnecting…' : 'Disconnected'}
             </Badge>
           </div>
 
@@ -103,7 +108,7 @@ export default function DevicesTab() {
                   <Usb className="w-5 h-5 mr-2" />
                   {isConnecting ? 'Connecting...' : 'Connect USB Printer'}
                 </Button>
-                <Button onClick={refresh} variant="outline" disabled={isConnecting} className="h-14 px-6">
+                <Button onClick={() => {}} variant="outline" disabled={isConnecting} className="h-14 px-6">
                   <RefreshCw className="w-5 h-5" />
                 </Button>
               </>
@@ -170,7 +175,7 @@ export default function DevicesTab() {
               <ol className="list-decimal list-inside mt-2 space-y-1">
                 <li>Configure scanner for keyboard wedge mode</li>
                 <li>Set suffix to "Enter" or "Tab" for auto-advance</li>
-                <li>Test by scanning into the Scan & Print tab</li>
+                <li>Test by scanning into the Scan &amp; Print tab</li>
               </ol>
             </AlertDescription>
           </Alert>

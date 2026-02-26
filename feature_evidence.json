@@ -1,30 +1,4 @@
 {
   "kind": "feature_evidence_report",
-  "features": [
-    {
-      "featureId": "feature-add-a-barcode-width-input-field-to-the-label-settings-tab-ui-the-field-should-allow-users-to-adjust-the-barcode-width-in-dots-or-appropriate-unit-consistent-with-existing-settings-it-must-read-from-and-write-to-the-labelsettingsstore-be-validated-via-barcodesettingsvalidation-and-be-reflected-live-in-the-labelpreview-component",
-      "featureTitle": "Add a barcode width input field to the Label Settings tab UI. The field should allow users to adjust the barcode width (in dots or appropriate unit consistent with existing settings). It must read from and write to the labelSettingsStore, be validated via barcodeSettingsValidation, and be reflected live in the LabelPreview component.",
-      "files": [
-        "frontend/src/printing/LabelPreview.tsx",
-        "frontend/src/printing/barcodePreview.ts",
-        "frontend/src/printing/cpclGenerator.ts",
-        "frontend/src/state/labelSettingsStore.ts",
-        "frontend/src/tabs/LabelSettingsTab.tsx",
-        "frontend/src/utils/barcodeSettingsValidation.ts",
-        "frontend/src/utils/labelSettingsImportExport.ts"
-      ],
-      "components": [
-        "authorization@4.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0"
-      ],
-      "testIds": [
-        "REQ-1"
-      ],
-      "confidence": "high"
-    }
-  ]
+  "features": []
 }

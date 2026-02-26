@@ -1,55 +1,151 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Add barcode width settings to Label Settings tab",
+  "title": "Fix repeated production deployment failure",
   "requirements": [
     {
-      "id": "REQ-1",
-      "summary": "Add barcode width input field to Label Settings tab UI with validation, store persistence, live preview, and CPCL generation support",
+      "id": "REQ-2",
+      "summary": "Audit and fix frontend build configuration to resolve production deployment failures",
       "acceptanceCriteria": [
-        "A barcode width input control is visible in the Label Settings tab alongside other barcode layout settings.",
-        "Changing the barcode width value updates the labelSettingsStore state.",
-        "The barcode width value persists across page reloads via localStorage.",
-        "The LabelPreview component reflects the updated barcode width in real time.",
-        "Invalid barcode width values are caught by barcodeSettingsValidation and display a user-friendly error message.",
-        "The barcode width setting is included in label settings import/export (JSON serialization).",
-        "The CPCL generator uses the stored barcode width value when generating print commands."
+        "The frontend production build completes without errors.",
+        "No broken imports, missing assets, or unresolved TypeScript type errors exist in the build output.",
+        "The deployed app loads correctly in production."
       ],
       "file_operations": [
         {
-          "path": "frontend/src/state/labelSettingsStore.ts",
+          "path": "frontend/package.json",
           "operation": "modify",
-          "description": "Add barcodeWidth field (bigint) to the LabelSettings type and state object in the labelSettingsStore. Initialize with a default value consistent with existing dot-based units (e.g., 2n for standard barcode width). Ensure BigInt serialization handles the new field during localStorage persistence and rehydration."
+          "description": "Review all dependencies and devDependencies for version conflicts or missing packages that could cause build failures. Ensure all @dfinity packages, React Query, Zustand, and other runtime dependencies are present and compatible. Verify build scripts are correctly configured."
+        },
+        {
+          "path": "frontend/vite.config.ts",
+          "operation": "modify",
+          "description": "Audit Vite configuration for any issues preventing production builds: verify plugin configurations, environment variable handling, asset paths, and build output settings. Ensure all referenced paths exist and are correct."
+        },
+        {
+          "path": "frontend/tsconfig.json",
+          "operation": "modify",
+          "description": "Check TypeScript configuration for strict mode issues, path mappings, and lib/types configurations that might cause type errors during build. Ensure all imported modules can be resolved."
+        },
+        {
+          "path": "frontend/tailwind.config.js",
+          "operation": "modify",
+          "description": "Verify Tailwind configuration content paths correctly match all component locations. Ensure plugins are installed and configured properly. Check for any syntax errors."
+        },
+        {
+          "path": "frontend/index.html",
+          "operation": "modify",
+          "description": "Review HTML template for broken asset references, incorrect script paths, or missing meta tags that could cause runtime failures in production."
+        },
+        {
+          "path": "frontend/src/main.tsx",
+          "operation": "modify",
+          "description": "Check the application entry point for any import errors, missing provider configurations, or initialization issues that would prevent the app from mounting in production."
+        },
+        {
+          "path": "frontend/src/App.tsx",
+          "operation": "modify",
+          "description": "Verify all top-level imports are valid, providers are correctly configured, and no runtime initialization errors exist that would cause the production build to fail."
+        },
+        {
+          "path": "frontend/src/backend.d.ts",
+          "operation": "modify",
+          "description": "Ensure backend type definitions are syntactically correct and all referenced types are properly imported. Verify enum declarations and interface definitions don't contain TypeScript errors."
+        },
+        {
+          "path": "frontend/index.css",
+          "operation": "modify",
+          "description": "Check for invalid CSS syntax, missing Tailwind directives, or broken custom property references that could cause the CSS build to fail."
+        },
+        {
+          "path": "frontend/src/hooks/useActor.ts",
+          "operation": "modify",
+          "description": "Verify actor initialization logic, IDL imports, and agent configuration are correct. Ensure no type mismatches exist that would cause build-time errors."
+        },
+        {
+          "path": "frontend/src/hooks/useInternetIdentity.ts",
+          "operation": "modify",
+          "description": "Check Internet Identity integration for proper AuthClient imports, type definitions, and async initialization patterns that might fail during production builds."
+        },
+        {
+          "path": "frontend/src/components/AppShell.tsx",
+          "operation": "modify",
+          "description": "Audit all component imports, asset references, and routing logic for broken paths or missing dependencies that would prevent the build from completing."
+        },
+        {
+          "path": "frontend/src/tabs/ScanPrintTab.tsx",
+          "operation": "modify",
+          "description": "Review all imports from printing utilities, hooks, and state stores. Ensure no circular dependencies or missing modules exist."
         },
         {
           "path": "frontend/src/tabs/LabelSettingsTab.tsx",
           "operation": "modify",
-          "description": "Add a barcode width input field to the Label Settings tab UI. Place it alongside existing barcode layout controls (near barcodeHeight). Wire the input to read from and write to labelSettingsStore.barcodeWidth. Include appropriate label, input validation, and error display. Trigger validation via barcodeSettingsValidation when the value changes."
+          "description": "Check for valid imports of validation utilities, settings stores, and UI components. Verify no type errors in form handling logic."
         },
         {
-          "path": "frontend/src/utils/barcodeSettingsValidation.ts",
+          "path": "frontend/src/tabs/DevicesTab.tsx",
           "operation": "modify",
-          "description": "Extend the validation logic to include barcode width validation. Check that barcodeWidth is a positive number within reasonable bounds (e.g., 1-10 dots for standard barcodes). Return user-friendly error messages for invalid barcode width values (e.g., 'Barcode width must be between 1 and 10 dots')."
+          "description": "Verify printer service imports and WebUSB API usage are correctly typed and imported."
         },
         {
-          "path": "frontend/src/printing/LabelPreview.tsx",
+          "path": "frontend/src/tabs/DiagnosticsTab.tsx",
           "operation": "modify",
-          "description": "Update the LabelPreview component to consume the barcodeWidth value from labelSettingsStore. Pass the barcode width to the barcode preview generation logic to adjust the visual representation of barcode bars in the preview. Ensure the preview reflects barcode width changes in real time."
-        },
-        {
-          "path": "frontend/src/printing/barcodePreview.ts",
-          "operation": "modify",
-          "description": "Modify the barcode SVG generation function to accept a width parameter (in dots). Use the width value to scale the bar widths in the generated SVG pattern, ensuring the barcode preview accurately reflects the configured barcode width setting."
+          "description": "Check all store imports (diagnostics, print history, logs) and ensure no missing dependencies or type errors exist."
         },
         {
           "path": "frontend/src/printing/cpclGenerator.ts",
           "operation": "modify",
-          "description": "Update the CPCL command generation logic to include the barcode width value from labelSettingsStore when generating barcode print commands. Ensure the CPCL barcode command uses the stored barcodeWidth value (converted to the appropriate CPCL parameter format) alongside existing barcode type and height settings."
+          "description": "Audit CPCL generation logic for type safety issues, missing imports, or syntax errors that could fail during TypeScript compilation."
+        },
+        {
+          "path": "frontend/src/printing/LabelPreview.tsx",
+          "operation": "modify",
+          "description": "Check SVG rendering logic, barcode preview imports, and unit conversion utilities for type errors or missing dependencies."
+        },
+        {
+          "path": "frontend/src/services/printerService.ts",
+          "operation": "modify",
+          "description": "Verify Zustand store configuration, USB transport imports, and async printer operations are correctly typed."
+        },
+        {
+          "path": "frontend/src/services/usbCpclTransport.ts",
+          "operation": "modify",
+          "description": "Check WebUSB API type definitions and ensure all Promise returns are correctly handled and typed."
+        },
+        {
+          "path": "frontend/src/state/labelSettingsStore.ts",
+          "operation": "modify",
+          "description": "Verify Zustand persist configuration, migration logic, and BigInt serialization are correctly implemented without type errors."
+        },
+        {
+          "path": "frontend/src/state/diagnosticsStore.ts",
+          "operation": "modify",
+          "description": "Check store persistence configuration and ensure all state update functions are properly typed."
+        },
+        {
+          "path": "frontend/src/state/printHistoryStore.ts",
+          "operation": "modify",
+          "description": "Verify print history persistence and reprint logic are correctly typed and implemented."
         },
         {
           "path": "frontend/src/utils/labelSettingsImportExport.ts",
           "operation": "modify",
-          "description": "Ensure the import/export serialization functions handle the barcodeWidth field. Include barcodeWidth in JSON serialization/deserialization with BigInt support. Add migration logic to handle legacy settings without barcodeWidth by applying the default value."
+          "description": "Check JSON serialization logic, BigInt handling, and migration utilities for type safety and correctness."
+        },
+        {
+          "path": "frontend/src/utils/barcodeSettingsValidation.ts",
+          "operation": "modify",
+          "description": "Verify validation logic returns correctly typed error structures and has no syntax errors."
+        },
+        {
+          "path": "frontend/src/utils/icErrors.ts",
+          "operation": "modify",
+          "description": "Check error parsing logic and type guards for Internet Computer errors are correctly implemented."
+        },
+        {
+          "path": "frontend/.env.production",
+          "operation": "modify",
+          "description": "Verify all required environment variables for production deployment are present and correctly formatted. Check for missing canister IDs, network configurations, or other build-time variables."
         }
       ]
     }

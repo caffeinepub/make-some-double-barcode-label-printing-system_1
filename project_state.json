@@ -1,32 +1,32 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "Label printing/settings project with barcode and serial validation features.",
+  "summary": "New project",
   "architectural_notes": [],
   "known_issues": [
-    "Barcode width settings missing from label settings tab"
+    "Repeated deployment errors when going live (production deployment fails consistently)"
   ],
   "isFixRequest": true,
-  "existing_features": [
-    {
-      "id": "feature-add-a-barcode-width-input-field-to-the-label-settings-tab-ui-the-field-should-allow-users-to-adjust-the-barcode-width-in-dots-or-appropriate-unit-consistent-with-existing-settings-it-must-read-from-and-write-to-the-labelsettingsstore-be-validated-via-barcodesettingsvalidation-and-be-reflected-live-in-the-labelpreview-component",
-      "title": "Add a barcode width input field to the Label Settings tab UI. The field should allow users to adjust the barcode width (in dots or appropriate unit consistent with existing settings). It must read from and write to the labelSettingsStore, be validated via barcodeSettingsValidation, and be reflected live in the LabelPreview component.",
-      "reqIds": [
-        "REQ-1"
-      ],
-      "version": 1
-    }
-  ],
+  "existing_features": [],
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Add barcode width settings in the label settings tab",
-      "reqIds": [],
+      "summary": "Investigate and resolve the recurring production deployment error. Audit the backend Motoko actor (backend/main.mo) for any syntax errors, type mismatches, or unstable type issues that would cause the canister build or upgrade to fail. Ensure the actor compiles cleanly and all stable variable declarations are valid.",
+      "reqIds": [
+        "REQ-1"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Audit the frontend build configuration (vite config, tsconfig, tailwind config, index.html, package.json) for any issues that would cause the production build to fail — such as missing environment variables, broken imports, type errors, or invalid asset references. Ensure the frontend builds cleanly for production.",
+      "reqIds": [
+        "REQ-2"
+      ],
       "status": "pending"
     }
   ],
-  "gameProjectType": "none",
-  "projectName": "Make Some Double!! Barcode Label Printing",
+  "projectName": "Fix repeated production deployment failure",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

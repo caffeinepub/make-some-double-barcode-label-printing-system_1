@@ -2,11 +2,12 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Printer, Sun } from 'lucide-react';
-import { usePrinterService } from '../services/printerService';
+import { usePrinterStore } from '../services/printerService';
 import { useWakeLock } from '../hooks/useWakeLock';
 
 export default function HeaderDeviceControls() {
-  const { isConnected } = usePrinterService();
+  const status = usePrinterStore((s) => s.status);
+  const isConnected = status === 'connected';
   const { isActive, isSupported, toggle } = useWakeLock();
 
   return (
@@ -14,8 +15,8 @@ export default function HeaderDeviceControls() {
       {/* Printer Status */}
       <div className="flex items-center gap-2">
         <Printer className="w-5 h-5 text-muted-foreground" />
-        <Badge 
-          variant={isConnected ? 'default' : 'destructive'} 
+        <Badge
+          variant={isConnected ? 'default' : 'destructive'}
           className="text-sm px-2 py-1"
         >
           {isConnected ? 'Connected' : 'Not Connected'}

@@ -1,41 +1,53 @@
 {
   "kind": "build_request",
-  "title": "Add barcode width settings to Label Settings tab",
-  "projectName": "Make Some Double!! Barcode Label Printing",
-  "priority": "normal",
+  "title": "Fix repeated production deployment failure",
+  "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Add a barcode width input field to the Label Settings tab UI. The field should allow users to adjust the barcode width (in dots or appropriate unit consistent with existing settings). It must read from and write to the labelSettingsStore, be validated via barcodeSettingsValidation, and be reflected live in the LabelPreview component.",
-      "target": "frontend",
+      "text": "Investigate and resolve the recurring production deployment error. Audit the backend Motoko actor (backend/main.mo) for any syntax errors, type mismatches, or unstable type issues that would cause the canister build or upgrade to fail. Ensure the actor compiles cleanly and all stable variable declarations are valid.",
+      "target": "backend",
       "source": {
         "messageIds": [
-          "msg-6"
+          "msg-latest"
         ],
         "quotes": [
-          "still missing barcode width settings in label settings tab."
+          "Failed to deploy to production: Deployment error"
         ]
       },
       "acceptanceCriteria": [
-        "A barcode width input control is visible in the Label Settings tab alongside other barcode layout settings.",
-        "Changing the barcode width value updates the labelSettingsStore state.",
-        "The barcode width value persists across page reloads via localStorage.",
-        "The LabelPreview component reflects the updated barcode width in real time.",
-        "Invalid barcode width values are caught by barcodeSettingsValidation and display a user-friendly error message.",
-        "The barcode width setting is included in label settings import/export (JSON serialization).",
-        "The CPCL generator uses the stored barcode width value when generating print commands."
+        "The backend Motoko actor compiles without errors or warnings that block deployment.",
+        "All stable variables use only stable types (no mutable objects, closures, or non-stable types in stable declarations).",
+        "Production deployment completes successfully without a 'Deployment error'."
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "text": "Audit the frontend build configuration (vite config, tsconfig, tailwind config, index.html, package.json) for any issues that would cause the production build to fail — such as missing environment variables, broken imports, type errors, or invalid asset references. Ensure the frontend builds cleanly for production.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-latest"
+        ],
+        "quotes": [
+          "Failed to deploy to production: Deployment error"
+        ]
+      },
+      "acceptanceCriteria": [
+        "The frontend production build completes without errors.",
+        "No broken imports, missing assets, or unresolved TypeScript type errors exist in the build output.",
+        "The deployed app loads correctly in production."
       ]
     }
   ],
   "constraints": [
-    "Do not modify any files under frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useActor.ts, frontend/src/main.tsx, or frontend/src/components/ui.",
-    "Barcode width setting must be consistent with existing dot-based units used throughout the label settings system.",
-    "Validation must go through the existing barcodeSettingsValidation utility."
+    "Do not change the application's existing features or user-facing behavior.",
+    "Do not modify immutable frontend paths: frontend/src/hooks/useInternetIdentity.ts, frontend/src/hooks/useActor.ts, frontend/src/main.tsx, frontend/src/components/ui."
   ],
   "nonGoals": [
-    "Do not add barcode height settings (not requested).",
-    "Do not change backend schema or Motoko actor for this feature.",
-    "Do not change the overall Label Settings tab layout beyond adding the new field."
+    "Adding new features or UI changes.",
+    "Changing the backend data model or business logic.",
+    "Modifying authentication or access control logic beyond what is needed to fix the build."
   ],
   "imageRequirements": {
     "required": [],
