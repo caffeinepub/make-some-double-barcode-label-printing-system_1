@@ -1,151 +1,84 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix repeated production deployment failure",
+  "title": "Persist settings locally, auto-reconnect printer, and duplicate serial error",
   "requirements": [
     {
-      "id": "REQ-2",
-      "summary": "Audit and fix frontend build configuration to resolve production deployment failures",
+      "id": "REQ-1",
+      "summary": "Persist all label settings to localStorage using Zustand persist middleware and automatically rehydrate on app open",
       "acceptanceCriteria": [
-        "The frontend production build completes without errors.",
-        "No broken imports, missing assets, or unresolved TypeScript type errors exist in the build output.",
-        "The deployed app loads correctly in production."
+        "Label settings changed by the user are saved to localStorage immediately.",
+        "On app open/reload, labelSettingsStore rehydrates from localStorage and the UI reflects the saved values.",
+        "If no saved settings exist, defaults are applied as before."
       ],
       "file_operations": [
         {
-          "path": "frontend/package.json",
+          "path": "frontend/src/state/labelSettingsStore.ts",
           "operation": "modify",
-          "description": "Review all dependencies and devDependencies for version conflicts or missing packages that could cause build failures. Ensure all @dfinity packages, React Query, Zustand, and other runtime dependencies are present and compatible. Verify build scripts are correctly configured."
-        },
+          "description": "Add Zustand persist middleware to the labelSettingsStore to automatically save all state (including barcode positions, dimensions, font sizes, layout settings, and prefix mappings) to localStorage and rehydrate on app initialization. Configure the persist middleware with a storage key and ensure all fields in the store state are included in persistence."
+        }
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "summary": "Persist prefix-to-label-type mappings to localStorage as part of labelSettingsStore persistence",
+      "acceptanceCriteria": [
+        "Prefix mappings configured by the user survive a page reload.",
+        "On app open, the prefix mappings are restored from localStorage and rendered correctly in the Label Settings tab.",
+        "New prefix mappings added by the user are persisted immediately."
+      ],
+      "file_operations": [
         {
-          "path": "frontend/vite.config.ts",
+          "path": "frontend/src/state/labelSettingsStore.ts",
           "operation": "modify",
-          "description": "Audit Vite configuration for any issues preventing production builds: verify plugin configurations, environment variable handling, asset paths, and build output settings. Ensure all referenced paths exist and are correct."
-        },
-        {
-          "path": "frontend/tsconfig.json",
-          "operation": "modify",
-          "description": "Check TypeScript configuration for strict mode issues, path mappings, and lib/types configurations that might cause type errors during build. Ensure all imported modules can be resolved."
-        },
-        {
-          "path": "frontend/tailwind.config.js",
-          "operation": "modify",
-          "description": "Verify Tailwind configuration content paths correctly match all component locations. Ensure plugins are installed and configured properly. Check for any syntax errors."
-        },
-        {
-          "path": "frontend/index.html",
-          "operation": "modify",
-          "description": "Review HTML template for broken asset references, incorrect script paths, or missing meta tags that could cause runtime failures in production."
-        },
-        {
-          "path": "frontend/src/main.tsx",
-          "operation": "modify",
-          "description": "Check the application entry point for any import errors, missing provider configurations, or initialization issues that would prevent the app from mounting in production."
-        },
-        {
-          "path": "frontend/src/App.tsx",
-          "operation": "modify",
-          "description": "Verify all top-level imports are valid, providers are correctly configured, and no runtime initialization errors exist that would cause the production build to fail."
-        },
-        {
-          "path": "frontend/src/backend.d.ts",
-          "operation": "modify",
-          "description": "Ensure backend type definitions are syntactically correct and all referenced types are properly imported. Verify enum declarations and interface definitions don't contain TypeScript errors."
-        },
-        {
-          "path": "frontend/index.css",
-          "operation": "modify",
-          "description": "Check for invalid CSS syntax, missing Tailwind directives, or broken custom property references that could cause the CSS build to fail."
-        },
-        {
-          "path": "frontend/src/hooks/useActor.ts",
-          "operation": "modify",
-          "description": "Verify actor initialization logic, IDL imports, and agent configuration are correct. Ensure no type mismatches exist that would cause build-time errors."
-        },
-        {
-          "path": "frontend/src/hooks/useInternetIdentity.ts",
-          "operation": "modify",
-          "description": "Check Internet Identity integration for proper AuthClient imports, type definitions, and async initialization patterns that might fail during production builds."
-        },
-        {
-          "path": "frontend/src/components/AppShell.tsx",
-          "operation": "modify",
-          "description": "Audit all component imports, asset references, and routing logic for broken paths or missing dependencies that would prevent the build from completing."
-        },
-        {
-          "path": "frontend/src/tabs/ScanPrintTab.tsx",
-          "operation": "modify",
-          "description": "Review all imports from printing utilities, hooks, and state stores. Ensure no circular dependencies or missing modules exist."
-        },
-        {
-          "path": "frontend/src/tabs/LabelSettingsTab.tsx",
-          "operation": "modify",
-          "description": "Check for valid imports of validation utilities, settings stores, and UI components. Verify no type errors in form handling logic."
-        },
-        {
-          "path": "frontend/src/tabs/DevicesTab.tsx",
-          "operation": "modify",
-          "description": "Verify printer service imports and WebUSB API usage are correctly typed and imported."
-        },
-        {
-          "path": "frontend/src/tabs/DiagnosticsTab.tsx",
-          "operation": "modify",
-          "description": "Check all store imports (diagnostics, print history, logs) and ensure no missing dependencies or type errors exist."
-        },
-        {
-          "path": "frontend/src/printing/cpclGenerator.ts",
-          "operation": "modify",
-          "description": "Audit CPCL generation logic for type safety issues, missing imports, or syntax errors that could fail during TypeScript compilation."
-        },
-        {
-          "path": "frontend/src/printing/LabelPreview.tsx",
-          "operation": "modify",
-          "description": "Check SVG rendering logic, barcode preview imports, and unit conversion utilities for type errors or missing dependencies."
-        },
+          "description": "Verify that the prefixMappings field in labelSettingsStore is included in the persisted state and not excluded from the persist middleware configuration. Ensure prefixMappings updates trigger immediate persistence to localStorage."
+        }
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "summary": "Save connected printer identifiers to localStorage and auto-reconnect on app open",
+      "acceptanceCriteria": [
+        "After a successful USB printer connection, the printer's identifying details are saved to localStorage.",
+        "On app open, if saved printer details exist, a reconnection attempt is made automatically without user interaction.",
+        "If reconnection succeeds, the printer status badge shows connected.",
+        "If reconnection fails (device not available), a non-blocking error is logged and the user can manually connect from the Devices tab.",
+        "If no prior printer was ever connected, no auto-connect attempt is made."
+      ],
+      "file_operations": [
         {
           "path": "frontend/src/services/printerService.ts",
           "operation": "modify",
-          "description": "Verify Zustand store configuration, USB transport imports, and async printer operations are correctly typed."
+          "description": "After successful USB printer connection via connectPrinter, extract the printer's USB vendor ID, product ID, and serial number (if available) from the WebUSB device object and save them to localStorage under a key like 'lastConnectedPrinter'. Add a new action autoReconnectPrinter that reads the saved printer identifiers from localStorage on app initialization, attempts to reconnect using the usbCpclTransport requestDevice with filters matching the saved IDs, and updates the connection state. If reconnection fails, log a non-blocking error to logStore without throwing. Wire this auto-reconnect action to be called from a useEffect in a top-level component."
         },
         {
           "path": "frontend/src/services/usbCpclTransport.ts",
           "operation": "modify",
-          "description": "Check WebUSB API type definitions and ensure all Promise returns are correctly handled and typed."
+          "description": "Add a new exported function reconnectToDevice that accepts USB vendor ID, product ID, and optional serial number, then uses navigator.usb.getDevices() to find a matching previously authorized device. If found, open the device and return the UsbDevice object; if not found or connection fails, return null. This enables silent reconnection without triggering a new browser permission prompt."
         },
         {
-          "path": "frontend/src/state/labelSettingsStore.ts",
+          "path": "frontend/src/App.tsx",
           "operation": "modify",
-          "description": "Verify Zustand persist configuration, migration logic, and BigInt serialization are correctly implemented without type errors."
-        },
+          "description": "Import the printerService store and call the autoReconnectPrinter action in a useEffect hook that runs once on mount (after password session unlock). Ensure the auto-reconnect attempt only runs when the app is unlocked and does not block rendering or login flow."
+        }
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "summary": "Detect duplicate serial numbers in two-step scan workflow, display inline error, play error sound, and block printing",
+      "acceptanceCriteria": [
+        "When the 2nd scanned serial is exactly the same as the 1st (after normalization), an error message is shown inline in the scan workflow (e.g., 'Serial numbers must be unique — please scan a different serial number.').",
+        "The error sound from soundSystem.ts is triggered immediately when the duplicate is detected.",
+        "The print action is blocked; no CPCL is generated or sent to the printer.",
+        "The 2nd serial input is cleared so the user can scan again.",
+        "The 1st serial remains set so the user does not need to re-scan it.",
+        "When the 2nd serial is different from the 1st, the workflow proceeds normally."
+      ],
+      "file_operations": [
         {
-          "path": "frontend/src/state/diagnosticsStore.ts",
+          "path": "frontend/src/tabs/ScanPrintTab.tsx",
           "operation": "modify",
-          "description": "Check store persistence configuration and ensure all state update functions are properly typed."
-        },
-        {
-          "path": "frontend/src/state/printHistoryStore.ts",
-          "operation": "modify",
-          "description": "Verify print history persistence and reprint logic are correctly typed and implemented."
-        },
-        {
-          "path": "frontend/src/utils/labelSettingsImportExport.ts",
-          "operation": "modify",
-          "description": "Check JSON serialization logic, BigInt handling, and migration utilities for type safety and correctness."
-        },
-        {
-          "path": "frontend/src/utils/barcodeSettingsValidation.ts",
-          "operation": "modify",
-          "description": "Verify validation logic returns correctly typed error structures and has no syntax errors."
-        },
-        {
-          "path": "frontend/src/utils/icErrors.ts",
-          "operation": "modify",
-          "description": "Check error parsing logic and type guards for Internet Computer errors are correctly implemented."
-        },
-        {
-          "path": "frontend/.env.production",
-          "operation": "modify",
-          "description": "Verify all required environment variables for production deployment are present and correctly formatted. Check for missing canister IDs, network configurations, or other build-time variables."
+          "description": "In the two-step scanning workflow (after the 2nd serial is scanned), normalize both the 1st and 2nd serial values using serialNormalization.ts normalizeSerial function, then compare them for exact equality. If they match, set a local error state with the message 'Serial numbers must be unique — please scan a different serial number.', call soundSystem playErrorSound action, clear the 2nd serial input field, and prevent the print workflow from proceeding. Display the error message inline near the 2nd serial input using an Alert or error text component. When the 2nd serial is changed or cleared, reset the error state. Ensure the 1st serial remains intact so the user can immediately re-scan the 2nd serial."
         }
       ]
     }

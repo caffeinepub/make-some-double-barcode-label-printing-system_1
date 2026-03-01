@@ -1,66 +1,74 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-26T20:55:19.030Z",
+  "generatedAt": "2026-02-25T06:50:04.647Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 2,
-    "implemented": 0,
+    "total": 4,
+    "implemented": 2,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Investigate and resolve the recurring production deployment error. Audit the backend Motoko actor (backend/main.mo) for any syntax errors, type mismatches, or unstable type issues that would cause the canister build or upgrade to fail. Ensure the actor compiles cleanly and all stable variable declarations are valid.",
-        "status": "unknown",
-        "plannedFiles": [],
+        "summary": "Persist all label settings (including barcode positions, dimensions, font sizes, and all other fields in labelSettingsStore) to localStorage and automatically rehydrate them when the app is opened. Ensure the Zustand store in labelSettingsStore.ts uses the `persist` middleware so state survives page reloads and app restarts.",
+        "status": "missing",
+        "plannedFiles": [
+          "frontend/src/state/labelSettingsStore.ts"
+        ],
         "matchedFiles": []
       },
       {
         "id": "REQ-2",
-        "summary": "Audit the frontend build configuration (vite config, tsconfig, tailwind config, index.html, package.json) for any issues that would cause the production build to fail — such as missing environment variables, broken imports, type errors, or invalid asset references. Ensure the frontend builds cleanly for production.",
+        "summary": "Persist all prefix-to-label-type mappings (prefix settings) to localStorage and automatically load them when the app is opened. These are part of labelSettingsStore; confirm they are included in the persisted state and not excluded from the persistence layer.",
         "status": "missing",
         "plannedFiles": [
-          "frontend/package.json",
-          "frontend/vite.config.ts",
-          "frontend/tsconfig.json",
-          "frontend/tailwind.config.js",
-          "frontend/index.html",
-          "frontend/src/main.tsx",
-          "frontend/src/App.tsx",
-          "frontend/src/backend.d.ts",
-          "frontend/index.css",
-          "frontend/src/hooks/useActor.ts",
-          "frontend/src/hooks/useInternetIdentity.ts",
-          "frontend/src/components/AppShell.tsx",
-          "frontend/src/tabs/ScanPrintTab.tsx",
-          "frontend/src/tabs/LabelSettingsTab.tsx",
-          "frontend/src/tabs/DevicesTab.tsx",
-          "frontend/src/tabs/DiagnosticsTab.tsx",
-          "frontend/src/printing/cpclGenerator.ts",
-          "frontend/src/printing/LabelPreview.tsx",
-          "frontend/src/services/printerService.ts",
-          "frontend/src/services/usbCpclTransport.ts",
-          "frontend/src/state/labelSettingsStore.ts",
-          "frontend/src/state/diagnosticsStore.ts",
-          "frontend/src/state/printHistoryStore.ts",
-          "frontend/src/utils/labelSettingsImportExport.ts",
-          "frontend/src/utils/barcodeSettingsValidation.ts",
-          "frontend/src/utils/icErrors.ts",
-          "frontend/.env.production"
+          "frontend/src/state/labelSettingsStore.ts"
         ],
         "matchedFiles": []
+      },
+      {
+        "id": "REQ-3",
+        "summary": "When a USB printer is successfully connected, save the printer's USB vendor ID and product ID (and any other identifying information available from WebUSB) to localStorage. On app open, automatically attempt to reconnect to the last connected printer using the stored identifiers. Show the connection result (success or failure) using the existing printer status badge in the header.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/services/printerService.ts",
+          "frontend/src/services/usbCpclTransport.ts",
+          "frontend/src/App.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/services/printerService.ts",
+          "frontend/src/services/usbCpclTransport.ts",
+          "frontend/src/App.tsx"
+        ]
+      },
+      {
+        "id": "REQ-4",
+        "summary": "In the ScanPrintTab two-step scanning workflow, after the 2nd serial number is scanned, check if it is exactly equal to the 1st serial number (after normalization via serialNormalization.ts). If they are identical, display a prominent inline error message instructing the user to scan a unique serial number, and play the error sound using the existing soundSystem.ts error sound. Do not proceed with printing. Clear the 2nd serial field so the user can re-scan.",
+        "status": "implemented",
+        "plannedFiles": [
+          "frontend/src/tabs/ScanPrintTab.tsx"
+        ],
+        "matchedFiles": [
+          "frontend/src/tabs/ScanPrintTab.tsx"
+        ]
       }
     ]
   },
   "changedFiles": [
-    "backend/main.mo",
     "build-request.json",
-    "build-template/README.md",
-    "caffeine.lock.json",
     "feature_evidence.json",
+    "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
+    "frontend/src/App.tsx",
+    "frontend/src/components/AppShell.tsx",
+    "frontend/src/components/HeaderDeviceControls.tsx",
+    "frontend/src/services/printerService.ts",
+    "frontend/src/services/usbCpclTransport.ts",
+    "frontend/src/state/printHistoryStore.ts",
+    "frontend/src/tabs/DevicesTab.tsx",
+    "frontend/src/tabs/ScanPrintTab.tsx",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

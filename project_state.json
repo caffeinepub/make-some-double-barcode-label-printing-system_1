@@ -1,32 +1,75 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "New project",
-  "architectural_notes": [],
-  "known_issues": [
-    "Repeated deployment errors when going live (production deployment fails consistently)"
+  "summary": "A barcode/label printing app with serial number scanning and printer connectivity features.",
+  "architectural_notes": [
+    "Settings and prefix values are persisted locally on the device (e.g., localStorage or AsyncStorage) and loaded on app startup.",
+    "Printer connection state is persisted locally; app auto-reconnects to last known printer on launch."
   ],
-  "isFixRequest": true,
-  "existing_features": [],
+  "known_issues": [],
+  "isFixRequest": false,
+  "existing_features": [
+    {
+      "id": "feature-when-a-usb-printer-is-successfully-connected-save-the-printer-s-usb-vendor-id-and-product-id-and-any-other-identifying-information-available-from-webusb-to-localstorage-on-app-open-automatically-attempt-to-reconnect-to-the-last-connected-printer-using-the-stored-identifiers-show-the-connection-result-success-or-failure-using-the-existing-printer-status-badge-in-the-header",
+      "title": "When a USB printer is successfully connected, save the printer's USB vendor ID and product ID (and any other identifying information available from WebUSB) to localStorage. On app open, automatically attempt to reconnect to the last connected printer using the stored identifiers. Show the connection result (success or failure) using the existing printer status badge in the header.",
+      "reqIds": [
+        "REQ-3"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-in-the-scanprinttab-two-step-scanning-workflow-after-the-2nd-serial-number-is-scanned-check-if-it-is-exactly-equal-to-the-1st-serial-number-after-normalization-via-serialnormalization-ts-if-they-are-identical-display-a-prominent-inline-error-message-instructing-the-user-to-scan-a-unique-serial-number-and-play-the-error-sound-using-the-existing-soundsystem-ts-error-sound-do-not-proceed-with-printing-clear-the-2nd-serial-field-so-the-user-can-re-scan",
+      "title": "In the ScanPrintTab two-step scanning workflow, after the 2nd serial number is scanned, check if it is exactly equal to the 1st serial number (after normalization via serialNormalization.ts). If they are identical, display a prominent inline error message instructing the user to scan a unique serial number, and play the error sound using the existing soundSystem.ts error sound. Do not proceed with printing. Clear the 2nd serial field so the user can re-scan.",
+      "reqIds": [
+        "REQ-4"
+      ],
+      "version": 1
+    }
+  ],
   "new_feature_requests": [
     {
       "id": "AR-1",
-      "summary": "Investigate and resolve the recurring production deployment error. Audit the backend Motoko actor (backend/main.mo) for any syntax errors, type mismatches, or unstable type issues that would cause the canister build or upgrade to fail. Ensure the actor compiles cleanly and all stable variable declarations are valid.",
+      "summary": "Save app settings locally on device and restore them when the app is opened",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Automatically connect to the last connected printer on app open",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-3",
+      "summary": "Save prefix settings locally on device and load them automatically when app is opened",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-4",
+      "summary": "When scanning 2nd serial number, if it matches the 1st, show an error message and play a sound notification prompting user to scan a unique serial number",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-5",
+      "summary": "Persist all label settings (including barcode positions, dimensions, font sizes, and all other fields in labelSettingsStore) to localStorage and automatically rehydrate them when the app is opened. Ensure the Zustand store in labelSettingsStore.ts uses the `persist` middleware so state survives page reloads and app restarts.",
       "reqIds": [
         "REQ-1"
       ],
       "status": "pending"
     },
     {
-      "id": "AR-2",
-      "summary": "Audit the frontend build configuration (vite config, tsconfig, tailwind config, index.html, package.json) for any issues that would cause the production build to fail — such as missing environment variables, broken imports, type errors, or invalid asset references. Ensure the frontend builds cleanly for production.",
+      "id": "AR-6",
+      "summary": "Persist all prefix-to-label-type mappings (prefix settings) to localStorage and automatically load them when the app is opened. These are part of labelSettingsStore; confirm they are included in the persisted state and not excluded from the persistence layer.",
       "reqIds": [
         "REQ-2"
       ],
       "status": "pending"
     }
   ],
-  "projectName": "Fix repeated production deployment failure",
+  "gameProjectType": "none",
+  "projectName": "Make Some Double Barcode",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }
